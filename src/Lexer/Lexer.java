@@ -18,7 +18,7 @@ public class Lexer {
     private int line;           // Line Number
     private int col;            // Column Number
 
-    // There are currently 97 possible different tokens
+    // There are currently 98 possible different tokens
     public enum TokenType {
         EOF,        // $
         ERROR,      // Error
@@ -145,6 +145,7 @@ public class Lexer {
         LBRACK,     // [
         RBRACK,     // ]
         COLON,      // :
+        COMMA,      // ,
         AT,         // @
     }
 
@@ -273,6 +274,9 @@ public class Lexer {
 
                     // Error
                     return new Token(TokenType.ERROR, "ERROR", lineStart, line, colStart, col);
+                case ',':
+                    consume();
+                    return new Token(TokenType.COMMA, ",", lineStart, line, colStart, col);
                 case '(':
                     consume();
                     return new Token(TokenType.LPAREN, "(", lineStart, line, colStart, col);

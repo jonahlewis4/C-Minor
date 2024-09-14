@@ -1,30 +1,44 @@
 package Parser;
 
 import java.util.ArrayList;
+import java.util.List;
 import Lexer.Lexer;
 import Lexer.Token;
+
+/*
+                        TO-DO LIST
+
+1. Given ID, choose scalar-type OR class-name
+
+
+*/
 
 public class Parser {
     private Lexer input;
     private Token currToken;
-    private int inputPos;
+    private final List<Token> nextToks;
 
     public Parser(Lexer input) {
         this.input = input;
-        this.inputPos = 0;
+        this.nextToks = new ArrayList<>();
+        consume();
     }
 
-    private void consume() {
-        this.inputPos += 1;
-    }
+    private void consume() { currToken = this.input.nextToken(); }
 
     private boolean match(Lexer.TokenType expectedTok) {
-        if(currToken.getTokenType() != expectedTok)
-            return false;
-        return true;
+        if(currToken.getTokenType() == expectedTok) {
+            consume();
+            return true;
+        }
+        else throw new IllegalArgumentException("Warning! Expected " + expectedTok + ", but got " + currToken.getTokenType());
     }
 
+    private boolean checkType(Lexer.TokenType expectedTok) { return currToken.getTokenType() == expectedTok; }
 
+    private void predict() {
+
+    }
     /*
     ------------------------------------------------------------
                           COMPILATION UNIT
@@ -33,7 +47,17 @@ public class Parser {
 
     // 1. compilation ::= file-merge* enum-type* global-variable* class-type* function* main
     public void compilation() {
+        while(checkType(Lexer.TokenType.ENUM))
+            enumType();
 
+        while(checkType(Lexer.TokenType.CONST) || checkType(Lexer.TokenType.GLOBAL))
+            globalVariable();
+
+        while(checkType(Lexer.TokenType.ABSTR) || checkType(Lexer.TokenType.FINAL))
+            classType();
+
+        if(!checkType(Lexer.TokenType.EOF))
+            System.out.println("EOF Not Reached.");
     }
 
     /*
@@ -44,7 +68,16 @@ public class Parser {
 
     // 2. enum-type ::= Enum ID { ID (, ID)* }
     private void enumType() {
+        match(Lexer.TokenType.ENUM);
+        match(Lexer.TokenType.ID);
+        match(Lexer.TokenType.LBRACE);
+        match(Lexer.TokenType.ID);
 
+        while(checkType(Lexer.TokenType.COMMA)) {
+            match(Lexer.TokenType.COMMA);
+            match(Lexer.TokenType.ID);
+        }
+        match(Lexer.TokenType.RBRACE);
     }
 
     /*
@@ -55,22 +88,43 @@ public class Parser {
 
     // 3. global-variable ::= (const | global) variable-decl
     private void globalVariable() {
+        if(checkType(Lexer.TokenType.CONST))
+            match(Lexer.TokenType.CONST);
+        else if(checkType(Lexer.TokenType.GLOBAL))
+            match(Lexer.TokenType.GLOBAL);
+        else throw new IllegalStateException("Invalid Global Variable!");
+
+        variableDecl();
 
     }
 
     // 4. variable-decl ::= def variable-decl-list
     private void variableDecl() {
+        match(Lexer.TokenType.DEF);
+        variableDeclList();
 
     }
 
     // 5. variable-decl-list ::= variable-decl-init (, variable-decl-init)*
     private void variableDeclList() {
-
+        variableDeclInit();
+        while(checkType(Lexer.TokenType.COMMA)) {
+            match(Lexer.TokenType.COMMA);
+            variableDeclInit();
+        }
     }
 
     // 6. variable-decl-init ::= ID:type = (expression | uninit)
     private void variableDeclInit() {
-
+        match(Lexer.TokenType.ID);
+        match(Lexer.TokenType.COLON);
+        type();
+        match(Lexer.TokenType.EQ);
+        if(checkType(Lexer.TokenType.EXP))
+            expression();
+        else if(checkType(Lexer.TokenType.UNINIT))
+            match(Lexer.TokenType.UNINIT);
+        else throw new IllegalStateException("Error! Variable was not initialized.");
     }
 
     /*
@@ -81,27 +135,129 @@ public class Parser {
 
     // 7. type ::= scalar-type | class-name | List[type] | Tuple<type (, type)*>
     private void type() {
+        if( checkType(Lexer.TokenType.STRING) ||
+            checkType(Lexer.TokenType.REAL) ||
+            checkType(Lexer.TokenType.BOOL) ||
+            checkType(Lexer.TokenType.INT) ||
+            checkType(Lexer.TokenType.CHAR))
+                scalarType();
 
+        else if(checkType(Lexer.TokenType.LIST)) {
+            match(Lexer.TokenType.LIST);
+            match(Lexer.TokenType.LBRACK);
+            type();
+            match(Lexer.TokenType.RBRACK);
+        }
+        else if(checkType(Lexer.TokenType.TUPLE)) {
+            match(Lexer.TokenType.TUPLE);
+            match(Lexer.TokenType.LT);
+            type();
+            while(checkType(Lexer.TokenType.COMMA)) {
+                match(Lexer.TokenType.COMMA);
+                type();
+            }
+        }
+        else throw new IllegalStateException("Error! Can not determine type...");
     }
 
     // 8. scalar-type ::= discrete-type
     //                  | String([INT-LITERAL])*
     //                  | Real (:INT-LITERAL)? ([INT-LITERAL])*
     private void scalarType() {
-
+        if(checkType(Lexer.TokenType.STRING)) {
+            match(Lexer.TokenType.STRING);
+            while(checkType(Lexer.TokenType.LBRACK)) {
+                match(Lexer.TokenType.LBRACK);
+                match(Lexer.TokenType.INT_LIT);
+                match(Lexer.TokenType.RBRACK);
+            }
+        }
+        else if(checkType(Lexer.TokenType.REAL)) {
+            match(Lexer.TokenType.REAL);
+            if(checkType(Lexer.TokenType.COLON)) {
+                match(Lexer.TokenType.COLON);
+                match(Lexer.TokenType.INT_LIT);
+            }
+            while(checkType(Lexer.TokenType.LBRACK)) {
+                match(Lexer.TokenType.LBRACK);
+                match(Lexer.TokenType.INT_LIT);
+                match(Lexer.TokenType.RBRACK);
+            }
+        }
+        else
+            discreteType();
     }
 
     // 9. discrete-type ::= Bool([INT-LITERAL])*
-    //                     | Int (: INT-LITERAL .. INT-LITERAL)? ([INT-LITERAL])*
-    //                     | Char(: CHAR-LITERAL .. CHAR-LITERAL)? ([INT-LITERAL])?
-    //                     | ID (: ID .. ID)? ([INT-LITERAL])*
+    //                    | Int (: INT-LITERAL .. INT-LITERAL)? ([INT-LITERAL])*
+    //                    | Char(: CHAR-LITERAL .. CHAR-LITERAL)? ([INT-LITERAL])*
+    //                    | ID (: ID .. ID)? ([INT-LITERAL])*
     private void discreteType() {
-
+        if(checkType(Lexer.TokenType.BOOL)) {
+            match(Lexer.TokenType.BOOL);
+            while(checkType(Lexer.TokenType.LBRACK)) {
+                match(Lexer.TokenType.LBRACK);
+                match(Lexer.TokenType.INT_LIT);
+                match(Lexer.TokenType.RBRACK);
+            }
+        }
+        else if(checkType(Lexer.TokenType.INT)) {
+            match(Lexer.TokenType.INT);
+            if(checkType(Lexer.TokenType.COLON)) {
+                match(Lexer.TokenType.COLON);
+                match(Lexer.TokenType.INT_LIT);
+                match(Lexer.TokenType.INC);
+                match(Lexer.TokenType.INT_LIT);
+            }
+            while(checkType(Lexer.TokenType.LBRACK)) {
+                match(Lexer.TokenType.LBRACK);
+                match(Lexer.TokenType.INT_LIT);
+                match(Lexer.TokenType.RBRACK);
+            }
+        }
+        else if(checkType(Lexer.TokenType.CHAR)) {
+            match(Lexer.TokenType.CHAR);
+            if(checkType(Lexer.TokenType.COLON)) {
+                match(Lexer.TokenType.COLON);
+                match(Lexer.TokenType.CHAR_LIT);
+                match(Lexer.TokenType.INC);
+                match(Lexer.TokenType.CHAR_LIT);
+            }
+            while(checkType(Lexer.TokenType.LBRACK)) {
+                match(Lexer.TokenType.LBRACK);
+                match(Lexer.TokenType.INT_LIT);
+                match(Lexer.TokenType.RBRACK);
+            }
+        }
+        else if(checkType(Lexer.TokenType.ID)) {
+            match(Lexer.TokenType.ID);
+            if(checkType(Lexer.TokenType.COLON)) {
+                match(Lexer.TokenType.COLON);
+                match(Lexer.TokenType.ID);
+                match(Lexer.TokenType.INC);
+                match(Lexer.TokenType.ID);
+            }
+            while(checkType(Lexer.TokenType.LBRACK)) {
+                match(Lexer.TokenType.LBRACK);
+                match(Lexer.TokenType.INT_LIT);
+                match(Lexer.TokenType.RBRACK);
+            }
+        }
+        else throw new IllegalStateException("Invalid type entered!");
     }
 
-    // 10. class-name ::= ID (<type (, type)*>)>
+    // 10. class-name ::= ID (<type (, type)*>)?
     private void className() {
-
+        match(Lexer.TokenType.ID);
+        if(checkType(Lexer.TokenType.LT)) {
+            match(Lexer.TokenType.LT);
+            type();
+            while(checkType(Lexer.TokenType.COMMA)) {
+                match(Lexer.TokenType.COMMA);
+                type();
+            }
+            match(Lexer.TokenType.GT);
+        }
     }
 
     /*
@@ -112,22 +268,54 @@ public class Parser {
 
     // 11. class-type ::= (abstr | final) class ID type-params? super-class? body-decl
     private void classType() {
+        if(checkType(Lexer.TokenType.ABSTR))
+            match(Lexer.TokenType.ABSTR);
+        else if(checkType(Lexer.TokenType.FINAL))
+            match(Lexer.TokenType.FINAL);
+        else throw new IllegalStateException("Invalid class modifier.");
 
+        match(Lexer.TokenType.CLASS);
+        match(Lexer.TokenType.ID);
+
+        if(checkType(Lexer.TokenType.LT))
+            typeParams();
+
+        if(checkType(Lexer.TokenType.INHERITS))
+            superClass();
+
+        bodyDecl();
     }
 
     // 12. type-params ::= <type (, type)*>
     private void typeParams() {
-
+        match(Lexer.TokenType.LT);
+        type();
+        while(checkType(Lexer.TokenType.COMMA)) {
+            match(Lexer.TokenType.COMMA);
+            type();
+        }
     }
 
     // 13. super-class ::= inherits ID type-params?
     private void superClass() {
-
+        match(Lexer.TokenType.INHERITS);
+        match(Lexer.TokenType.ID);
+        if(checkType(Lexer.TokenType.LT))
+            typeParams();
     }
 
     // 14. body-decl ::= protected {data-field* method*} public {data-field* method*}
     private void bodyDecl() {
+        match(Lexer.TokenType.PROTECTED);
+        while(checkType(Lexer.TokenType.REF) || checkType(Lexer.TokenType.DEF))
+            dataField();
 
+        // method check here
+
+        match(Lexer.TokenType.PUBLIC);
+        while(checkType(Lexer.TokenType.REF) || checkType(Lexer.TokenType.DEF))
+            dataField();
+        // method check here as well
     }
 
     /*
@@ -138,12 +326,17 @@ public class Parser {
 
     // 15. data-field ::= ref? variable-decl
     private void dataField() {
-
+        if(checkType(Lexer.TokenType.REF))
+            match(Lexer.TokenType.REF);
+        variableDecl();
     }
 
     // 16. method ::= method-class | operator-class
     private void method() {
 
+        if(checkType(Lexer.TokenType.FINAL) || checkType(Lexer.TokenType.OPERATOR))
+            operatorClass();
+        else throw new IllegalStateException("Invalid Method Declaration");
     }
 
     /*
