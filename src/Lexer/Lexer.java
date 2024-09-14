@@ -72,12 +72,12 @@ public class Lexer {
         PUBLIC,     // public
         PURE,       // pure
         REAL,       // Real
+        REASSIGN,   // Reassign
         RECURS,     // recurs
         REF,        // ref
         REMOVE,     // remove
         RETURN,     // return
         SCALAR,     // scalar
-        SET,        // set ... consider changing
         SLICE,      // slice
         STOP,       // stop
         STRING,     // String
@@ -438,12 +438,12 @@ public class Lexer {
             case "public" -> new Token(TokenType.PUBLIC, "public", lineStart, line, colStart, col);
             case "pure" -> new Token(TokenType.PURE, "pure", lineStart, line, colStart, col);
             case "Real" -> new Token(TokenType.REAL, "Real", lineStart, line, colStart, col);
+            case "reassign" -> new Token(TokenType.REASSIGN, "reassign", lineStart, line, colStart, col);
             case "recurs" -> new Token(TokenType.RECURS, "recurs", lineStart, line, colStart, col);
             case "ref" -> new Token(TokenType.REF, "ref", lineStart, line, colStart, col);
             case "remove" -> new Token(TokenType.REMOVE, "remove", lineStart, line, colStart, col);
             case "return" -> new Token(TokenType.RETURN, "return", lineStart, line, colStart, col);
             case "scalar" -> new Token(TokenType.SCALAR, "scalar", lineStart, line, colStart, col);
-            case "set" -> new Token(TokenType.SET, "set", lineStart, line, colStart, col);
             case "slice" -> new Token(TokenType.SLICE, "slice", lineStart, line, colStart, col);
             case "stop" -> new Token(TokenType.STOP, "stop", lineStart, line, colStart, col);
             case "String" -> new Token(TokenType.STRING, "String", lineStart, line, colStart, col);

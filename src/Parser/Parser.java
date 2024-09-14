@@ -9,8 +9,11 @@ import Lexer.Token;
                         TO-DO LIST
 
 1. Given ID, choose scalar-type OR class-name
+2. Given def, choose function or main
+3. BodyDecls
+4. Operator Declarations
 
-
+ref def ?
 */
 
 public class Parser {
@@ -55,6 +58,9 @@ public class Parser {
 
         while(checkType(Lexer.TokenType.ABSTR) || checkType(Lexer.TokenType.FINAL))
             classType();
+
+        while(checkType(Lexer.TokenType.DEF))
+            mainFunc();
 
         if(!checkType(Lexer.TokenType.EOF))
             System.out.println("EOF Not Reached.");
@@ -352,32 +358,75 @@ public class Parser {
 
     // 18. method-header ::= ID (formal-params?)
     private void methodHeader() {
-
+        match(Lexer.TokenType.ID);
+        match(Lexer.TokenType.LPAREN);
+        if( checkType(Lexer.TokenType.IN) ||
+            checkType(Lexer.TokenType.OUT) ||
+            checkType(Lexer.TokenType.INOUT) ||
+            checkType(Lexer.TokenType.REF))
+                formalParams();
     }
 
     // 19. modifier ::= final | pure | recurs
     private void modifier() {
-
+        if(checkType(Lexer.TokenType.FINAL))
+            match(Lexer.TokenType.FINAL);
+        else if(checkType(Lexer.TokenType.PURE))
+            match(Lexer.TokenType.PURE);
+        else if(checkType(Lexer.TokenType.RECURS))
+            match(Lexer.TokenType.RECURS);
+        else throw new IllegalStateException("Error: Invalid Method Modifier");
     }
 
     // 20. formal-params ::= (in | out | inout | in out | ref) type ID
     private void formalParams() {
+        if(checkType(Lexer.TokenType.IN))
+            match(Lexer.TokenType.IN);
+        else if(checkType(Lexer.TokenType.OUT))
+            match(Lexer.TokenType.OUT);
+        else if(checkType(Lexer.TokenType.INOUT))
+            match(Lexer.TokenType.INOUT);
+        else if(checkType(Lexer.TokenType.REF))
+            match(Lexer.TokenType.REF);
+        else throw new IllegalStateException("Error: Invalid Function Parameter Type!");
 
+        type();
+        match(Lexer.TokenType.ID);
     }
 
     // 21. return-type ::= Void | type
     private void returnType() {
-
+        if(checkType(Lexer.TokenType.VOID))
+            match(Lexer.TokenType.VOID);
+        else type();
     }
 
     // 22. operator-class ::= final? operator operator-header => return-type block-statement
     private void operatorClass() {
+        if(checkType(Lexer.TokenType.FINAL))
+            match(Lexer.TokenType.FINAL);
 
+        match(Lexer.TokenType.OPERATOR);
+        operatorHeader();
+
+        match(Lexer.TokenType.EQ);
+        match(Lexer.TokenType.GT);
+
+        returnType();
+        blockStatement();
     }
 
     // 23. operator-header ::= operator-declaration (formal-params?)
     private void operatorHeader() {
+        operatorDeclaration();
 
+        match(Lexer.TokenType.LPAREN);
+        if( checkType(Lexer.TokenType.IN) ||
+            checkType(Lexer.TokenType.OUT) ||
+            checkType(Lexer.TokenType.INOUT) ||
+            checkType(Lexer.TokenType.REF))
+            formalParams();
+        match(Lexer.TokenType.RPAREN);
     }
 
     // 24. operator-declaration ::= binary-operator | unary-operator
@@ -392,7 +441,11 @@ public class Parser {
 
     // 26. unary-operator ::= - | not
     private void unaryOperator() {
-
+        if(checkType(Lexer.TokenType.MINUS))
+            match(Lexer.TokenType.MINUS);
+        else if(checkType(Lexer.TokenType.NOT))
+            match(Lexer.TokenType.NOT);
+        else throw new IllegalStateException("Invalid Unary Operator!");
     }
 
 
@@ -404,22 +457,62 @@ public class Parser {
 
     // 27. function ::= (pure | recurs)? def function-header => return-type block-statement
     private void function() {
+        if(checkType(Lexer.TokenType.PURE))
+            match(Lexer.TokenType.PURE);
+        else if(checkType(Lexer.TokenType.RECURS))
+            match(Lexer.TokenType.RECURS);
 
+        match(Lexer.TokenType.DEF);
+
+        functionHeader();
+
+        match(Lexer.TokenType.EQ);
+        match(Lexer.TokenType.GT);
+
+        returnType();
+        blockStatement();
     }
 
     // 28. function-header ::= ID function-type-params? (formal-params?)
     private void functionHeader() {
+        match(Lexer.TokenType.ID);
 
+        if(checkType(Lexer.TokenType.LT))
+            functionTypeParams();
+
+        match(Lexer.TokenType.LPAREN);
+
+        if( checkType(Lexer.TokenType.IN) ||
+            checkType(Lexer.TokenType.OUT) ||
+            checkType(Lexer.TokenType.INOUT) ||
+            checkType(Lexer.TokenType.REF))
+                formalParams();
+
+        match(Lexer.TokenType.RPAREN);
     }
 
-    // 29. function-type-params ::= <typeifier, (, typeifier)*)>
+    // 29. function-type-params ::= <typeifier (, typeifier)*)>
     private void functionTypeParams() {
+        match(Lexer.TokenType.LT);
+        typeifier();
 
+        while(checkType(Lexer.TokenType.COMMA)) {
+            match(Lexer.TokenType.COMMA);
+            typeifier();
+        }
+        match(Lexer.TokenType.GT);
     }
 
     // 30. typeifier ::= (discr | scalar | class)? ID
     private void typeifier() {
+        if(checkType(Lexer.TokenType.DISCR))
+            match(Lexer.TokenType.DISCR);
+        else if(checkType(Lexer.TokenType.SCALAR))
+            match(Lexer.TokenType.SCALAR);
+        else if(checkType(Lexer.TokenType.CLASS))
+            match(Lexer.TokenType.CLASS);
 
+        match(Lexer.TokenType.ID);
     }
 
     /*
@@ -430,17 +523,34 @@ public class Parser {
 
     // 31. main ::= def main block-statement
     private void mainFunc() {
-
+        match(Lexer.TokenType.DEF);
+        match(Lexer.TokenType.MAIN);
+        blockStatement();
     }
 
     // 32. block-statement ::= {declaration* statement*}
     private void blockStatement() {
+        match(Lexer.TokenType.LBRACE);
+        while(checkType(Lexer.TokenType.LOCAL) || checkType(Lexer.TokenType.DEF))
+            declaration();
 
+        match(Lexer.TokenType.RBRACE);
     }
 
     // 33. declaration ::= local? variable-decl | ref variable-decl
     private void declaration() {
+        if(checkType(Lexer.TokenType.LOCAL))
+            match(Lexer.TokenType.LOCAL);
 
+        if(checkType(Lexer.TokenType.DEF)) {
+            match(Lexer.TokenType.DEF);
+            variableDecl();
+        }
+        else if(checkType(Lexer.TokenType.REF)) {
+            match(Lexer.TokenType.REF);
+            variableDecl();
+        }
+        else throw new IllegalStateException("Error Invalid Declaration!");
     }
 
     /*
@@ -457,22 +567,34 @@ public class Parser {
 
     // 35. return-statement ::= return expression?
     private void returnStatement() {
+        match(Lexer.TokenType.RETURN);
 
+        // CALL expression
     }
 
     // 36. assignment-statement ::= reassign ID = argument-value
     private void assignmentStatement() {
-
+        match(Lexer.TokenType.REASSIGN);
+        match(Lexer.TokenType.ID);
+        match(Lexer.TokenType.EQ);
+        argumentValue();
     }
 
     // 37. argument-value ::= ref expression | expression
     private void argumentValue() {
-
+        if(checkType(Lexer.TokenType.REF)) {
+            match(Lexer.TokenType.REF);
+            expression();
+        }
+        else expression();
     }
 
     // 38. if-statement ::= if expression block-statement (elseif-statement)* (else block-statement)?
     private void ifStatement() {
+        match(Lexer.TokenType.IF);
 
+        expression();
+        blockStatement();
     }
 
     // 39. elseif-statement ::= else if expression block-statement
@@ -532,7 +654,9 @@ public class Parser {
 
     // 50. case-statement ::= on label block-statement
     private void caseStatement() {
-
+        match(Lexer.TokenType.ON);
+        label();
+        blockStatement();
     }
 
     // 51. label ::= constant (.. constant)?
@@ -640,7 +764,10 @@ public class Parser {
 
     // 69. object-field ::= ID = expression
     private void objectField() {
+        match(Lexer.TokenType.ID);
+        match(Lexer.TokenType.EQ);
 
+        expression();
     }
 
     // 70. array-constant ::= Array ([expression])* (expression) | [expression (, expression)*]
