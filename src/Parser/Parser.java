@@ -1,7 +1,5 @@
 package Parser;
 
-import java.util.ArrayList;
-import java.util.List;
 import Lexer.Lexer;
 import Lexer.Token;
 
@@ -13,8 +11,8 @@ import Lexer.Token;
 */
 
 public class Parser {
-    private Lexer input;
-    private int k;                 // k = # of lookaheads
+    private final Lexer input;
+    private final int k;              // k = # of lookaheads
     private int lookPos;
     private final Token[] lookaheads;
 
@@ -32,10 +30,9 @@ public class Parser {
         lookPos = (lookPos + 1) % k;
     }
 
-    private boolean match(Lexer.TokenType expectedTok) {
+    private void match(Lexer.TokenType expectedTok) {
         if(nextLA(0) == expectedTok) {
             consume();
-            return true;
         }
         else throw new IllegalArgumentException("Warning! Expected " + expectedTok + ", but got " + nextLA(0));
     }
@@ -54,6 +51,9 @@ public class Parser {
 
     // 1. compilation ::= file-merge* enum-type* global-variable* class-type* function* main
     public void compilation() {
+        while(nextLA(0) == Lexer.TokenType.INCLUDE || nextLA(0) == Lexer.TokenType.EXCLUDE)
+            fileMerge();
+
         while(nextLA(0) == Lexer.TokenType.ENUM)
             enumType();
 
@@ -607,6 +607,20 @@ public class Parser {
         while(nextLA(0) == Lexer.TokenType.LOCAL || nextLA(0) == Lexer.TokenType.DEF)
             declaration();
 
+        // TODO: ADD INPUT/OUTPUT KEYWORDS HERE
+        while(nextLA(0) == Lexer.TokenType.STOP ||
+                nextLA(0) == Lexer.TokenType.RETURN ||
+                nextLA(0) == Lexer.TokenType.REASSIGN ||
+                nextLA(0) == Lexer.TokenType.LBRACE ||
+                nextLA(0) == Lexer.TokenType.IF ||
+                nextLA(0) == Lexer.TokenType.FOR ||
+                nextLA(0) == Lexer.TokenType.LOOP ||
+                nextLA(0) == Lexer.TokenType.CHOICE ||
+                nextLA(0) == Lexer.TokenType.APPEND ||
+                nextLA(0) == Lexer.TokenType.REMOVE ||
+                nextLA(0) == Lexer.TokenType.INSERT)
+            statement();
+
         match(Lexer.TokenType.RBRACE);
     }
 
@@ -632,15 +646,37 @@ public class Parser {
     ------------------------------------------------------------
     */
 
-    // 34. statement ::= stop | return-statement | assignment-statement | block-statment | if-statement
+    // 34. statement ::= stop | return-statement | assignment-statement | block-statement | if-statement
     //                 | iterator-statement | loop-statement | choice-statement | list-command-statement | input-output-statement
     private void statement() {
-
+        if(nextLA(0) == Lexer.TokenType.STOP)
+            match(Lexer.TokenType.STOP);
+        else if(nextLA(0) == Lexer.TokenType.RETURN)
+            returnStatement();
+        else if(nextLA(0) == Lexer.TokenType.REASSIGN)
+            assignmentStatement();
+        else if(nextLA(0) == Lexer.TokenType.LBRACE)
+            blockStatement();
+        else if(nextLA(0) == Lexer.TokenType.IF)
+            ifStatement();
+        else if(nextLA(0) == Lexer.TokenType.FOR)
+            iteratorStatement();
+        else if(nextLA(0) == Lexer.TokenType.LOOP)
+            loopStatement();
+        else if(nextLA(0) == Lexer.TokenType.CHOICE)
+            choiceStatement();
+        else if(nextLA(0) == Lexer.TokenType.APPEND ||
+                nextLA(0) == Lexer.TokenType.REMOVE ||
+                nextLA(0) == Lexer.TokenType.INSERT)
+                listCommandStatement();
+        // TODO: Add input/output statement call here
+        else throw new IllegalStateException("Error! Invalid Statement!");
     }
 
     // 35. return-statement ::= return expression?
     private void returnStatement() {
         match(Lexer.TokenType.RETURN);
+        expression();
         // CALL expression
     }
 
@@ -686,42 +722,65 @@ public class Parser {
     // 40. iterator-statement ::= for (range-iterator | array-iterator) block-statement
     private void iteratorStatement() {
         match(Lexer.TokenType.FOR);
-
+        // Choose between range/array iterators
         blockStatement();
     }
-
+    // TODO: Figure out how to tell between range/array iterator
     // 41. range-iterator ::= ID in expression range-operator expression
     private void rangeIterator() {
-
+        match(Lexer.TokenType.ID);
+        match(Lexer.TokenType.IN);
+        expression();
+        rangeOperator();
+        expression();
     }
 
     // 42. array-iterator ::= ID (in | inrev) expression
     private void arrayIterator() {
-
+        match(Lexer.TokenType.ID);
+        if(nextLA(0) == Lexer.TokenType.IN)
+            match(Lexer.TokenType.IN);
+        else if(nextLA(0) == Lexer.TokenType.INREV)
+            match(Lexer.TokenType.INREV);
+        else throw new IllegalStateException("Error! Invalid syntax");
+        expression();
     }
 
     // 43. range-operator ::= inclusive | exclusive-right | exclusive-left | exclusive
     private void rangeOperator() {
+        if(nextLA(0) == Lexer.TokenType.INC && nextLA(1) == Lexer.TokenType.LT)
+            exclusiveRight();
+        else if(nextLA(0) == Lexer.TokenType.INC)
+            inclusive();
+        else if(nextLA(0) == Lexer.TokenType.LT && nextLA(1) == Lexer.TokenType.INC
+                && nextLA(2) == Lexer.TokenType.LT)
+            exclusive();
+        else
+            exclusiveLeft();
     }
 
     // 44. inclusive ::= ..
     private void inclusive() {
-
+        match(Lexer.TokenType.INC);
     }
 
     // 45. exclusive-right ::= ..<
     private void exclusiveRight() {
-
+        match(Lexer.TokenType.INC);
+        match(Lexer.TokenType.LT);
     }
 
     // 46. exclusive-left ::= <..
     private void exclusiveLeft() {
-
+        match(Lexer.TokenType.LT);
+        match(Lexer.TokenType.INC);
     }
 
     // 47. exclusive ::= <..<
     private void exclusive() {
-
+        match(Lexer.TokenType.LT);
+        match(Lexer.TokenType.INC);
+        match(Lexer.TokenType.LT);
     }
 
     // 48. loop-statement ::= loop { declaration* statement* until (expression) statement* }
@@ -733,12 +792,36 @@ public class Parser {
               nextLA(0) == Lexer.TokenType.LOCAL)
                 declaration();
 
-        // statements call
+        // TODO: ADD INPUT/OUTPUT KEYWORDS HERE
+        while(nextLA(0) == Lexer.TokenType.STOP ||
+                nextLA(0) == Lexer.TokenType.RETURN ||
+                nextLA(0) == Lexer.TokenType.REASSIGN ||
+                nextLA(0) == Lexer.TokenType.LBRACE ||
+                nextLA(0) == Lexer.TokenType.IF ||
+                nextLA(0) == Lexer.TokenType.FOR ||
+                nextLA(0) == Lexer.TokenType.LOOP ||
+                nextLA(0) == Lexer.TokenType.CHOICE ||
+                nextLA(0) == Lexer.TokenType.APPEND ||
+                nextLA(0) == Lexer.TokenType.REMOVE ||
+                nextLA(0) == Lexer.TokenType.INSERT)
+                statement();
         match(Lexer.TokenType.UNTIL);
         match(Lexer.TokenType.LPAREN);
         expression();
         match(Lexer.TokenType.RPAREN);
-        //statements call
+        // TODO: ADD INPUT/OUTPUT KEYWORDS HERE
+        while(nextLA(0) == Lexer.TokenType.STOP ||
+                nextLA(0) == Lexer.TokenType.RETURN ||
+                nextLA(0) == Lexer.TokenType.REASSIGN ||
+                nextLA(0) == Lexer.TokenType.LBRACE ||
+                nextLA(0) == Lexer.TokenType.IF ||
+                nextLA(0) == Lexer.TokenType.FOR ||
+                nextLA(0) == Lexer.TokenType.LOOP ||
+                nextLA(0) == Lexer.TokenType.CHOICE ||
+                nextLA(0) == Lexer.TokenType.APPEND ||
+                nextLA(0) == Lexer.TokenType.REMOVE ||
+                nextLA(0) == Lexer.TokenType.INSERT)
+            statement();
         match(Lexer.TokenType.RBRACE);
     }
 
@@ -772,13 +855,27 @@ public class Parser {
 
     // 52. list-command-statement ::= append (argument-list) | remove (argument-list) | insert (argument-list)
     private void listCommandStatement() {
+        // TODO: ADD ARGUMENTLIST to end of rules
         if(nextLA(0) == Lexer.TokenType.APPEND) {
             match(Lexer.TokenType.APPEND);
             match(Lexer.TokenType.LPAREN);
             //argumentList();
+            match(Lexer.TokenType.RPAREN);
         }
+        else if(nextLA(0) == Lexer.TokenType.REMOVE) {
+            match(Lexer.TokenType.REMOVE);
+            match(Lexer.TokenType.LPAREN);
+            match(Lexer.TokenType.RPAREN);
+        }
+        else if(nextLA(0) == Lexer.TokenType.INSERT) {
+            match(Lexer.TokenType.INSERT);
+            match(Lexer.TokenType.LPAREN);
+            match(Lexer.TokenType.RPAREN);
+        }
+        else throw new IllegalStateException("Error! Invalid List command!");
     }
 
+    // TODO: Add input-statement/output-statement rules
     // 53. input-output-statement ::= input-statement | output-statement
     private void inputOutputStatement() {
 
@@ -934,6 +1031,8 @@ public class Parser {
     // 64. factor-expression ::= call-expression | uninit? (expression) | length (expression)
     //                         | slice (expression, expression range-operator expression) | cast (type, expression)
     private void factorExpression() {
+        //TODO: Ambiguity with call-expression || uninit? (expression)
+        callExpression();
        // if(nextLA(0) == Lexer.TokenType.UNINIT || nextLA(0) == Lexer.TokenType.LPAREN)
 
         if(nextLA(0) == Lexer.TokenType.LENGTH) {
@@ -966,22 +1065,41 @@ public class Parser {
         }
     }
 
-    // 65. call-expression ::= primary ( (argument-list?) | . ID | [expression])*
+    // 65. call-expression ::= primary ( (argument-list?) | . ID | [expression] )*
     private void callExpression() {
         primary();
-
+        while(nextLA(0) == Lexer.TokenType.LPAREN ||
+              nextLA(0) == Lexer.TokenType.PERIOD ||
+              nextLA(0) == Lexer.TokenType.LBRACK) {
+            if(nextLA(0) == Lexer.TokenType.LPAREN) {
+                match(Lexer.TokenType.LPAREN);
+                // argument_list goes here
+                match(Lexer.TokenType.RPAREN);
+            }
+            else if(nextLA(0) == Lexer.TokenType.PERIOD) {
+                match(Lexer.TokenType.PERIOD);
+                match(Lexer.TokenType.ID);
+            }
+            else if(nextLA(0) == Lexer.TokenType.LBRACK) {
+                match(Lexer.TokenType.LBRACK);
+                expression();
+                match(Lexer.TokenType.RBRACK);
+            }
+            else throw new IllegalStateException("Error! Invalid call expression");
+        }
     }
 
     // 66. primary ::= ID | constant | (expression)
     private void primary() {
-        if(nextLA(0) == Lexer.TokenType.ID)
-            match(Lexer.TokenType.ID);
-
-        else if(nextLA(0) == Lexer.TokenType.LPAREN) {
+        if(nextLA(0) == Lexer.TokenType.LPAREN) {
             match(Lexer.TokenType.LPAREN);
             expression();
             match(Lexer.TokenType.RPAREN);
         }
+        else if(nextLA(0) == Lexer.TokenType.ID && nextLA(1) == Lexer.TokenType.LPAREN)
+            constant();
+        else if(nextLA(0) == Lexer.TokenType.ID)
+            match(Lexer.TokenType.ID);
     }
 
     /*
@@ -1035,7 +1153,28 @@ public class Parser {
 
     // 71. list-constant ::= List ( (expression (, expression)*)? ) | {expression (, expression)*}
     private void listConstant() {
+        match(Lexer.TokenType.LIST);
+        if(nextLA(0) == Lexer.TokenType.LPAREN) {
+            match(Lexer.TokenType.LPAREN);
+            if(nextLA(0) != Lexer.TokenType.RPAREN) {
+                expression();
+                while(nextLA(0) == Lexer.TokenType.COMMA) {
+                    match(Lexer.TokenType.COMMA);
+                    expression();
+                }
+            }
+            match(Lexer.TokenType.RPAREN);
 
+        }
+        else if(nextLA(0) == Lexer.TokenType.LBRACE) {
+            match(Lexer.TokenType.LBRACE);
+            expression();
+            while(nextLA(0) == Lexer.TokenType.COMMA) {
+                match(Lexer.TokenType.COMMA);
+                expression();
+            }
+            match(Lexer.TokenType.RBRACE);
+        }
     }
 
     // 72. tuple-constant ::= Tuple ( (expression (, expression)*)? ) | (expression (, expression)*)
@@ -1072,33 +1211,73 @@ public class Parser {
     ------------------------------------------------------------
     */
 
+    // TODO: Is rename optional?
     // 75. file-merge ::= #include filename choice? rename | #exclude choice
     private void fileMerge() {
-
+        if(nextLA(0) == Lexer.TokenType.INCLUDE) {
+            match(Lexer.TokenType.INCLUDE);
+            fileName();
+            if(nextLA(0) == Lexer.TokenType.ONLY)
+                choice();
+            //rename();
+        }
+        else if(nextLA(0) == Lexer.TokenType.EXCLUDE) {
+            match(Lexer.TokenType.EXCLUDE);
+            choice();
+        }
     }
 
     // 76. filename ::= STRING-LITERAL
     private void fileName() {
-
+        match(Lexer.TokenType.STR_LIT);
     }
 
     // 77. choice ::= only {global-id (, global-id)*} | except {global_id (, global_id)*}
     private void choice() {
-
+        if(nextLA(0) == Lexer.TokenType.ONLY) {
+            match(Lexer.TokenType.ONLY);
+            match(Lexer.TokenType.LBRACE);
+            globalID();
+            while(nextLA(0) == Lexer.TokenType.COMMA) {
+                match(Lexer.TokenType.COMMA);
+                globalID();
+            }
+            match(Lexer.TokenType.RBRACE);
+        }
+        else if(nextLA(0) == Lexer.TokenType.EXCEPT) {
+            match(Lexer.TokenType.EXCEPT);
+            match(Lexer.TokenType.LBRACE);
+            globalID();
+            while(nextLA(0) == Lexer.TokenType.COMMA) {
+                match(Lexer.TokenType.COMMA);
+                globalID();
+            }
+            match(Lexer.TokenType.RBRACE);
+        }
     }
 
     // 78. global-id ::= ID
     private void globalID() {
-
+        match(Lexer.TokenType.ID);
     }
 
     // 79. rename ::= rename {change-id (, change-id)*}
     private void rename() {
-
+        match(Lexer.TokenType.RENAME);
+        match(Lexer.TokenType.LBRACE);
+        changeID();
+        while(nextLA(0) == Lexer.TokenType.COMMA) {
+            match(Lexer.TokenType.COMMA);
+            changeID();
+        }
+        match(Lexer.TokenType.RBRACE);
     }
 
     // 80. change-id ::= ID => ID
     private void changeID() {
-
+        match(Lexer.TokenType.ID);
+        match(Lexer.TokenType.EQ);
+        match(Lexer.TokenType.GT);
+        match(Lexer.TokenType.ID);
     }
 }

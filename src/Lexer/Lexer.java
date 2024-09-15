@@ -15,7 +15,7 @@ public class Lexer {
     private int line;           // Line Number
     private int col;            // Column Number
 
-    // There are currently 98 possible different tokens
+    // There are currently 104 possible different tokens
     public enum TokenType {
         EOF,        // $
         ERROR,      // Error
@@ -41,11 +41,14 @@ public class Lexer {
         ELSE,       // else
         ENDL,       // endl
         ENUM,       // Enum
+        EXCEPT,     // except
+        EXCLUDE,    // #exclude
         FINAL,      // final
         FOR,        // for
         GLOBAL,     // global
         IF,         // if
         IN,         // in
+        INCLUDE,    // #include
         INT,        // Int
         INHERITS,   // inherits
         INOUT,      // inout        | in out??
@@ -59,6 +62,7 @@ public class Lexer {
         METHOD,     // method
         NOT,        // not
         ON,         // on
+        ONLY,       // only
         OPERATOR,   // operator
         OTHER,      // other
         OUT,        // out
@@ -73,6 +77,7 @@ public class Lexer {
         RECURS,     // recurs
         REF,        // ref
         REMOVE,     // remove
+        RENAME,     // rename
         RETURN,     // return
         SCALAR,     // scalar
         SLICE,      // slice
@@ -142,6 +147,7 @@ public class Lexer {
         LBRACK,     // [
         RBRACK,     // ]
         COLON,      // :
+        PERIOD,     // .
         COMMA,      // ,
         AT,         // @
     }
@@ -269,8 +275,7 @@ public class Lexer {
                     if(match('.'))
                         return new Token(TokenType.INC, "..", lineStart, line, colStart, col);
 
-                    // Error
-                    return new Token(TokenType.ERROR, "ERROR", lineStart, line, colStart, col);
+                    return new Token(TokenType.PERIOD, ".", lineStart, line, colStart, col);
                 case ',':
                     consume();
                     return new Token(TokenType.COMMA, ",", lineStart, line, colStart, col);
@@ -301,7 +306,7 @@ public class Lexer {
                         return strLit(new StringBuilder(), lineStart, colStart);
                     return charLit(lineStart, colStart);
                 default:
-                    if(isLetter())
+                    if(isLetter() || match('#'))
                         return name(lineStart, colStart);
                     if(isDigit())
                         return number(lineStart, colStart);
@@ -375,7 +380,8 @@ public class Lexer {
 
     private Token name(int lineStart, int colStart) {
         StringBuilder createStr = new StringBuilder();
-        while(isLetter()) {
+
+        while(isLetter() || match('#')) {
             createStr.append(lookChar);
             consume();
         }
@@ -389,6 +395,8 @@ public class Lexer {
             //                                            KEYWORDS
             // -----------------------------------------------------------------------------------------------
 
+            case "#include" -> new Token(TokenType.INCLUDE, "#include", lineStart, line, colStart, col);
+            case "#exclude" -> new Token(TokenType.EXCLUDE, "#exclude", lineStart, line, colStart, col);
             case "abstr" -> new Token(TokenType.ABSTR, "abstr", lineStart, line, colStart, col);
             case "and" -> new Token(TokenType.AND, "and", lineStart, line, colStart, col);
             case "append" -> new Token(TokenType.APPEND, "append", lineStart, line, colStart, col);
@@ -405,6 +413,7 @@ public class Lexer {
             case "else" -> new Token(TokenType.ELSE, "else", lineStart, line, colStart, col);
             case "endl" -> new Token(TokenType.ENDL, "endl", lineStart, line, colStart, col);
             case "Enum" -> new Token(TokenType.ENUM, "Enum", lineStart, line, colStart, col);
+            case "except" -> new Token(TokenType.EXCEPT, "except", lineStart, line, colStart, col);
             case "final" -> new Token(TokenType.FINAL, "final", lineStart, line, colStart, col);
             case "for" -> new Token(TokenType.FOR, "for", lineStart, line, colStart, col);
             case "global" -> new Token(TokenType.GLOBAL, "global", lineStart, line, colStart, col);
@@ -424,6 +433,7 @@ public class Lexer {
             case "method" -> new Token(TokenType.METHOD, "method", lineStart, line, colStart, col);
             case "not" -> new Token(TokenType.NOT, "not", lineStart, line, colStart, col);
             case "on" -> new Token(TokenType.ON, "on", lineStart, line, colStart, col);
+            case "only" -> new Token(TokenType.ONLY, "only", lineStart, line, colStart, col);
             case "operator" -> new Token(TokenType.OPERATOR, "operator", lineStart, line, colStart, col);
             case "or" -> new Token(TokenType.OR, "or", lineStart, line, colStart, col);
             case "other" -> new Token(TokenType.OTHER, "other", lineStart, line, colStart, col);
@@ -439,6 +449,7 @@ public class Lexer {
             case "recurs" -> new Token(TokenType.RECURS, "recurs", lineStart, line, colStart, col);
             case "ref" -> new Token(TokenType.REF, "ref", lineStart, line, colStart, col);
             case "remove" -> new Token(TokenType.REMOVE, "remove", lineStart, line, colStart, col);
+            case "rename" -> new Token(TokenType.RENAME, "rename", lineStart, line, colStart, col);
             case "return" -> new Token(TokenType.RETURN, "return", lineStart, line, colStart, col);
             case "scalar" -> new Token(TokenType.SCALAR, "scalar", lineStart, line, colStart, col);
             case "slice" -> new Token(TokenType.SLICE, "slice", lineStart, line, colStart, col);
