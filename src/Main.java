@@ -5,7 +5,7 @@ import Parser.Parser;
 public class Main {
     public static void main(String[] args) {
         String input = """
-             global def bob:Char = uninit
+             Enum  {alice, bob, mary, cathy, problem}
              """;
 
         var lexer = new Lexer(input);

@@ -6,42 +6,46 @@ import Lexer.Lexer;
 import Lexer.Token;
 
 /*
-                        TO-DO LIST
-
-1. Given ID, choose scalar-type OR class-name
-2. Given def, choose function or main
-3. BodyDecls
-4. Operator Declarations
-
-ref def ?
+                            ERRORS
+1. ref def ?
+2. input-statement, output-statement, argument-list missing rules
+3. operator-declaration, - ?
 */
 
 public class Parser {
     private Lexer input;
-    private Token currToken;
-    private final List<Token> nextToks;
+    private int k;                 // k = # of lookaheads
+    private int lookPos;
+    private final Token[] lookaheads;
 
     public Parser(Lexer input) {
         this.input = input;
-        this.nextToks = new ArrayList<>();
-        consume();
+        this.k = 3;
+        this.lookPos = 0;
+        this.lookaheads = new Token[k];
+        for(int i = 0; i < k; i++)
+            consume();
     }
 
-    private void consume() { currToken = this.input.nextToken(); }
+    private void consume() {
+        lookaheads[lookPos] = this.input.nextToken();
+        lookPos = (lookPos + 1) % k;
+    }
 
     private boolean match(Lexer.TokenType expectedTok) {
-        if(currToken.getTokenType() == expectedTok) {
+        if(nextLA(0) == expectedTok) {
             consume();
             return true;
         }
-        else throw new IllegalArgumentException("Warning! Expected " + expectedTok + ", but got " + currToken.getTokenType());
+        else throw new IllegalArgumentException("Warning! Expected " + expectedTok + ", but got " + nextLA(0));
     }
 
-    private boolean checkType(Lexer.TokenType expectedTok) { return currToken.getTokenType() == expectedTok; }
+    // currentLA : Returns the current token we are checking
+    private Token currentLA(int nextPos) { return lookaheads[(lookPos+nextPos)%k]; }
 
-    private void predict() {
+    // nextLA : Returns the next LA at the specified index
+    private Lexer.TokenType nextLA(int nextPos) { return currentLA(nextPos).getTokenType(); }
 
-    }
     /*
     ------------------------------------------------------------
                           COMPILATION UNIT
@@ -50,19 +54,23 @@ public class Parser {
 
     // 1. compilation ::= file-merge* enum-type* global-variable* class-type* function* main
     public void compilation() {
-        while(checkType(Lexer.TokenType.ENUM))
+        while(nextLA(0) == Lexer.TokenType.ENUM)
             enumType();
 
-        while(checkType(Lexer.TokenType.CONST) || checkType(Lexer.TokenType.GLOBAL))
+        while(nextLA(0) == Lexer.TokenType.CONST || nextLA(0) == Lexer.TokenType.GLOBAL)
             globalVariable();
 
-        while(checkType(Lexer.TokenType.ABSTR) || checkType(Lexer.TokenType.FINAL))
+        while(nextLA(0) == Lexer.TokenType.ABSTR || nextLA(0) == Lexer.TokenType.FINAL)
             classType();
 
-        while(checkType(Lexer.TokenType.DEF))
-            mainFunc();
+        while((nextLA(0) == Lexer.TokenType.DEF && nextLA(1) != Lexer.TokenType.MAIN) ||
+               nextLA(0) == Lexer.TokenType.PURE ||
+               nextLA(0) == Lexer.TokenType.RECURS)
+                function();
 
-        if(!checkType(Lexer.TokenType.EOF))
+        mainFunc();
+
+        if(nextLA(0) != Lexer.TokenType.EOF)
             System.out.println("EOF Not Reached.");
     }
 
@@ -79,7 +87,7 @@ public class Parser {
         match(Lexer.TokenType.LBRACE);
         match(Lexer.TokenType.ID);
 
-        while(checkType(Lexer.TokenType.COMMA)) {
+        while(nextLA(0) == Lexer.TokenType.COMMA) {
             match(Lexer.TokenType.COMMA);
             match(Lexer.TokenType.ID);
         }
@@ -94,9 +102,9 @@ public class Parser {
 
     // 3. global-variable ::= (const | global) variable-decl
     private void globalVariable() {
-        if(checkType(Lexer.TokenType.CONST))
+        if(nextLA(0) == Lexer.TokenType.CONST)
             match(Lexer.TokenType.CONST);
-        else if(checkType(Lexer.TokenType.GLOBAL))
+        else if(nextLA(0) == Lexer.TokenType.GLOBAL)
             match(Lexer.TokenType.GLOBAL);
         else throw new IllegalStateException("Invalid Global Variable!");
 
@@ -108,13 +116,12 @@ public class Parser {
     private void variableDecl() {
         match(Lexer.TokenType.DEF);
         variableDeclList();
-
     }
 
     // 5. variable-decl-list ::= variable-decl-init (, variable-decl-init)*
     private void variableDeclList() {
         variableDeclInit();
-        while(checkType(Lexer.TokenType.COMMA)) {
+        while(nextLA(0) == Lexer.TokenType.COMMA) {
             match(Lexer.TokenType.COMMA);
             variableDeclInit();
         }
@@ -126,11 +133,9 @@ public class Parser {
         match(Lexer.TokenType.COLON);
         type();
         match(Lexer.TokenType.EQ);
-        if(checkType(Lexer.TokenType.EXP))
-            expression();
-        else if(checkType(Lexer.TokenType.UNINIT))
+        if(nextLA(0) == Lexer.TokenType.UNINIT)
             match(Lexer.TokenType.UNINIT);
-        else throw new IllegalStateException("Error! Variable was not initialized.");
+        else expression();
     }
 
     /*
@@ -141,24 +146,29 @@ public class Parser {
 
     // 7. type ::= scalar-type | class-name | List[type] | Tuple<type (, type)*>
     private void type() {
-        if( checkType(Lexer.TokenType.STRING) ||
-            checkType(Lexer.TokenType.REAL) ||
-            checkType(Lexer.TokenType.BOOL) ||
-            checkType(Lexer.TokenType.INT) ||
-            checkType(Lexer.TokenType.CHAR))
+        if( nextLA(0) == Lexer.TokenType.STRING ||
+            nextLA(0) == Lexer.TokenType.REAL ||
+            nextLA(0) == Lexer.TokenType.BOOL ||
+            nextLA(0) == Lexer.TokenType.INT ||
+            nextLA(0) == Lexer.TokenType.CHAR ||
+            (nextLA(0) == Lexer.TokenType.ID && (nextLA(1) == Lexer.TokenType.COLON ||
+            nextLA(1) == Lexer.TokenType.LBRACK)))
                 scalarType();
 
-        else if(checkType(Lexer.TokenType.LIST)) {
+        else if(nextLA(0) == Lexer.TokenType.ID)
+            className();
+
+        else if(nextLA(0) == Lexer.TokenType.LIST) {
             match(Lexer.TokenType.LIST);
             match(Lexer.TokenType.LBRACK);
             type();
             match(Lexer.TokenType.RBRACK);
         }
-        else if(checkType(Lexer.TokenType.TUPLE)) {
+        else if(nextLA(0) == Lexer.TokenType.TUPLE) {
             match(Lexer.TokenType.TUPLE);
             match(Lexer.TokenType.LT);
             type();
-            while(checkType(Lexer.TokenType.COMMA)) {
+            while(nextLA(0) == Lexer.TokenType.COMMA) {
                 match(Lexer.TokenType.COMMA);
                 type();
             }
@@ -170,21 +180,21 @@ public class Parser {
     //                  | String([INT-LITERAL])*
     //                  | Real (:INT-LITERAL)? ([INT-LITERAL])*
     private void scalarType() {
-        if(checkType(Lexer.TokenType.STRING)) {
+        if(nextLA(0) == Lexer.TokenType.STRING) {
             match(Lexer.TokenType.STRING);
-            while(checkType(Lexer.TokenType.LBRACK)) {
+            while(nextLA(0) == Lexer.TokenType.LBRACK) {
                 match(Lexer.TokenType.LBRACK);
                 match(Lexer.TokenType.INT_LIT);
                 match(Lexer.TokenType.RBRACK);
             }
         }
-        else if(checkType(Lexer.TokenType.REAL)) {
+        else if(nextLA(0) == Lexer.TokenType.REAL) {
             match(Lexer.TokenType.REAL);
-            if(checkType(Lexer.TokenType.COLON)) {
+            if(nextLA(0) == Lexer.TokenType.COLON) {
                 match(Lexer.TokenType.COLON);
                 match(Lexer.TokenType.INT_LIT);
             }
-            while(checkType(Lexer.TokenType.LBRACK)) {
+            while(nextLA(0) == Lexer.TokenType.LBRACK) {
                 match(Lexer.TokenType.LBRACK);
                 match(Lexer.TokenType.INT_LIT);
                 match(Lexer.TokenType.RBRACK);
@@ -199,51 +209,51 @@ public class Parser {
     //                    | Char(: CHAR-LITERAL .. CHAR-LITERAL)? ([INT-LITERAL])*
     //                    | ID (: ID .. ID)? ([INT-LITERAL])*
     private void discreteType() {
-        if(checkType(Lexer.TokenType.BOOL)) {
+        if(nextLA(0) == Lexer.TokenType.BOOL) {
             match(Lexer.TokenType.BOOL);
-            while(checkType(Lexer.TokenType.LBRACK)) {
+            while(nextLA(0) == Lexer.TokenType.LBRACK) {
                 match(Lexer.TokenType.LBRACK);
                 match(Lexer.TokenType.INT_LIT);
                 match(Lexer.TokenType.RBRACK);
             }
         }
-        else if(checkType(Lexer.TokenType.INT)) {
+        else if(nextLA(0) == Lexer.TokenType.INT) {
             match(Lexer.TokenType.INT);
-            if(checkType(Lexer.TokenType.COLON)) {
+            if(nextLA(0) == Lexer.TokenType.COLON) {
                 match(Lexer.TokenType.COLON);
                 match(Lexer.TokenType.INT_LIT);
                 match(Lexer.TokenType.INC);
                 match(Lexer.TokenType.INT_LIT);
             }
-            while(checkType(Lexer.TokenType.LBRACK)) {
+            while(nextLA(0) == Lexer.TokenType.LBRACK) {
                 match(Lexer.TokenType.LBRACK);
                 match(Lexer.TokenType.INT_LIT);
                 match(Lexer.TokenType.RBRACK);
             }
         }
-        else if(checkType(Lexer.TokenType.CHAR)) {
+        else if(nextLA(0) == Lexer.TokenType.CHAR) {
             match(Lexer.TokenType.CHAR);
-            if(checkType(Lexer.TokenType.COLON)) {
+            if(nextLA(0) == Lexer.TokenType.COLON) {
                 match(Lexer.TokenType.COLON);
                 match(Lexer.TokenType.CHAR_LIT);
                 match(Lexer.TokenType.INC);
                 match(Lexer.TokenType.CHAR_LIT);
             }
-            while(checkType(Lexer.TokenType.LBRACK)) {
+            while(nextLA(0) == Lexer.TokenType.LBRACK) {
                 match(Lexer.TokenType.LBRACK);
                 match(Lexer.TokenType.INT_LIT);
                 match(Lexer.TokenType.RBRACK);
             }
         }
-        else if(checkType(Lexer.TokenType.ID)) {
+        else if(nextLA(0) == Lexer.TokenType.ID) {
             match(Lexer.TokenType.ID);
-            if(checkType(Lexer.TokenType.COLON)) {
+            if(nextLA(0) == Lexer.TokenType.COLON) {
                 match(Lexer.TokenType.COLON);
                 match(Lexer.TokenType.ID);
                 match(Lexer.TokenType.INC);
                 match(Lexer.TokenType.ID);
             }
-            while(checkType(Lexer.TokenType.LBRACK)) {
+            while(nextLA(0) == Lexer.TokenType.LBRACK) {
                 match(Lexer.TokenType.LBRACK);
                 match(Lexer.TokenType.INT_LIT);
                 match(Lexer.TokenType.RBRACK);
@@ -255,10 +265,10 @@ public class Parser {
     // 10. class-name ::= ID (<type (, type)*>)?
     private void className() {
         match(Lexer.TokenType.ID);
-        if(checkType(Lexer.TokenType.LT)) {
+        if(nextLA(0) == Lexer.TokenType.LT) {
             match(Lexer.TokenType.LT);
             type();
-            while(checkType(Lexer.TokenType.COMMA)) {
+            while(nextLA(0) == Lexer.TokenType.COMMA) {
                 match(Lexer.TokenType.COMMA);
                 type();
             }
@@ -274,19 +284,19 @@ public class Parser {
 
     // 11. class-type ::= (abstr | final) class ID type-params? super-class? body-decl
     private void classType() {
-        if(checkType(Lexer.TokenType.ABSTR))
+        if(nextLA(0) == Lexer.TokenType.ABSTR)
             match(Lexer.TokenType.ABSTR);
-        else if(checkType(Lexer.TokenType.FINAL))
+        else if(nextLA(0) == Lexer.TokenType.FINAL)
             match(Lexer.TokenType.FINAL);
         else throw new IllegalStateException("Invalid class modifier.");
 
         match(Lexer.TokenType.CLASS);
         match(Lexer.TokenType.ID);
 
-        if(checkType(Lexer.TokenType.LT))
+        if(nextLA(0) == Lexer.TokenType.LT)
             typeParams();
 
-        if(checkType(Lexer.TokenType.INHERITS))
+        if(nextLA(0) == Lexer.TokenType.INHERITS)
             superClass();
 
         bodyDecl();
@@ -296,7 +306,7 @@ public class Parser {
     private void typeParams() {
         match(Lexer.TokenType.LT);
         type();
-        while(checkType(Lexer.TokenType.COMMA)) {
+        while(nextLA(0) == Lexer.TokenType.COMMA) {
             match(Lexer.TokenType.COMMA);
             type();
         }
@@ -306,22 +316,35 @@ public class Parser {
     private void superClass() {
         match(Lexer.TokenType.INHERITS);
         match(Lexer.TokenType.ID);
-        if(checkType(Lexer.TokenType.LT))
+        if(nextLA(0) == Lexer.TokenType.LT)
             typeParams();
     }
 
     // 14. body-decl ::= protected {data-field* method*} public {data-field* method*}
     private void bodyDecl() {
         match(Lexer.TokenType.PROTECTED);
-        while(checkType(Lexer.TokenType.REF) || checkType(Lexer.TokenType.DEF))
+        while(nextLA(0) == Lexer.TokenType.REF || nextLA(0) == Lexer.TokenType.DEF)
             dataField();
 
-        // method check here
+        while(nextLA(0) == Lexer.TokenType.FINAL ||
+              nextLA(0) == Lexer.TokenType.PURE ||
+              nextLA(0) == Lexer.TokenType.RECURS ||
+              nextLA(0) == Lexer.TokenType.OVERRIDE ||
+              nextLA(0) == Lexer.TokenType.METHOD ||
+              nextLA(0) == Lexer.TokenType.OPERATOR)
+                method();
 
         match(Lexer.TokenType.PUBLIC);
-        while(checkType(Lexer.TokenType.REF) || checkType(Lexer.TokenType.DEF))
+        while(nextLA(0) == Lexer.TokenType.REF || nextLA(0) == Lexer.TokenType.DEF)
             dataField();
-        // method check here as well
+
+        while(nextLA(0) == Lexer.TokenType.FINAL ||
+                nextLA(0) == Lexer.TokenType.PURE ||
+                nextLA(0) == Lexer.TokenType.RECURS ||
+                nextLA(0) == Lexer.TokenType.OVERRIDE ||
+                nextLA(0) == Lexer.TokenType.METHOD ||
+                nextLA(0) == Lexer.TokenType.OPERATOR)
+            method();
     }
 
     /*
@@ -332,17 +355,17 @@ public class Parser {
 
     // 15. data-field ::= ref? variable-decl
     private void dataField() {
-        if(checkType(Lexer.TokenType.REF))
+        if(nextLA(0) == Lexer.TokenType.REF)
             match(Lexer.TokenType.REF);
         variableDecl();
     }
 
     // 16. method ::= method-class | operator-class
     private void method() {
-
-        if(checkType(Lexer.TokenType.FINAL) || checkType(Lexer.TokenType.OPERATOR))
-            operatorClass();
-        else throw new IllegalStateException("Invalid Method Declaration");
+        if((nextLA(0) == Lexer.TokenType.FINAL && nextLA(1) == Lexer.TokenType.OPERATOR) ||
+            nextLA(0) == Lexer.TokenType.OPERATOR)
+                operatorClass();
+        else methodClass();
     }
 
     /*
@@ -353,40 +376,57 @@ public class Parser {
 
     // 17. method-class ::= modifier* override? method method-header => return-type block-statement
     private void methodClass() {
+        while(nextLA(0) == Lexer.TokenType.FINAL ||
+              nextLA(0) == Lexer.TokenType.PURE ||
+              nextLA(0) == Lexer.TokenType.RECURS)
+                modifier();
 
+        if(nextLA(0) == Lexer.TokenType.OVERRIDE)
+            match(Lexer.TokenType.OVERRIDE);
+
+        match(Lexer.TokenType.METHOD);
+
+        methodHeader();
+
+        match(Lexer.TokenType.EQ);
+        match(Lexer.TokenType.GT);
+
+        returnType();
+        blockStatement();
     }
 
     // 18. method-header ::= ID (formal-params?)
     private void methodHeader() {
         match(Lexer.TokenType.ID);
         match(Lexer.TokenType.LPAREN);
-        if( checkType(Lexer.TokenType.IN) ||
-            checkType(Lexer.TokenType.OUT) ||
-            checkType(Lexer.TokenType.INOUT) ||
-            checkType(Lexer.TokenType.REF))
+        if( nextLA(0) == Lexer.TokenType.IN ||
+            nextLA(0) == Lexer.TokenType.OUT ||
+            nextLA(0) == Lexer.TokenType.INOUT ||
+            nextLA(0) == Lexer.TokenType.REF)
                 formalParams();
+        match(Lexer.TokenType.RPAREN);
     }
 
     // 19. modifier ::= final | pure | recurs
     private void modifier() {
-        if(checkType(Lexer.TokenType.FINAL))
+        if(nextLA(0) == Lexer.TokenType.FINAL)
             match(Lexer.TokenType.FINAL);
-        else if(checkType(Lexer.TokenType.PURE))
+        else if(nextLA(0) == Lexer.TokenType.PURE)
             match(Lexer.TokenType.PURE);
-        else if(checkType(Lexer.TokenType.RECURS))
+        else if(nextLA(0) == Lexer.TokenType.RECURS)
             match(Lexer.TokenType.RECURS);
         else throw new IllegalStateException("Error: Invalid Method Modifier");
     }
 
     // 20. formal-params ::= (in | out | inout | in out | ref) type ID
     private void formalParams() {
-        if(checkType(Lexer.TokenType.IN))
+        if(nextLA(0) == Lexer.TokenType.IN)
             match(Lexer.TokenType.IN);
-        else if(checkType(Lexer.TokenType.OUT))
+        else if(nextLA(0) == Lexer.TokenType.OUT)
             match(Lexer.TokenType.OUT);
-        else if(checkType(Lexer.TokenType.INOUT))
+        else if(nextLA(0) == Lexer.TokenType.INOUT)
             match(Lexer.TokenType.INOUT);
-        else if(checkType(Lexer.TokenType.REF))
+        else if(nextLA(0) == Lexer.TokenType.REF)
             match(Lexer.TokenType.REF);
         else throw new IllegalStateException("Error: Invalid Function Parameter Type!");
 
@@ -396,14 +436,14 @@ public class Parser {
 
     // 21. return-type ::= Void | type
     private void returnType() {
-        if(checkType(Lexer.TokenType.VOID))
+        if(nextLA(0) == Lexer.TokenType.VOID)
             match(Lexer.TokenType.VOID);
         else type();
     }
 
     // 22. operator-class ::= final? operator operator-header => return-type block-statement
     private void operatorClass() {
-        if(checkType(Lexer.TokenType.FINAL))
+        if(nextLA(0) == Lexer.TokenType.FINAL)
             match(Lexer.TokenType.FINAL);
 
         match(Lexer.TokenType.OPERATOR);
@@ -421,29 +461,62 @@ public class Parser {
         operatorDeclaration();
 
         match(Lexer.TokenType.LPAREN);
-        if( checkType(Lexer.TokenType.IN) ||
-            checkType(Lexer.TokenType.OUT) ||
-            checkType(Lexer.TokenType.INOUT) ||
-            checkType(Lexer.TokenType.REF))
+        if( nextLA(0) == Lexer.TokenType.IN ||
+            nextLA(0) == Lexer.TokenType.OUT ||
+            nextLA(0) == Lexer.TokenType.INOUT ||
+            nextLA(0) == Lexer.TokenType.REF)
             formalParams();
         match(Lexer.TokenType.RPAREN);
     }
 
     // 24. operator-declaration ::= binary-operator | unary-operator
     private void operatorDeclaration() {
-
+        if(nextLA(0) == Lexer.TokenType.NOT)
+            unaryOperator();
+        else
+            binaryOperator();
     }
 
     // 25. binary-operator ::= <= | < | > | >= | == | <> | <=> | <: | :> | + | - | * | / | % | **
     private void binaryOperator() {
-
+        if(nextLA(0) == Lexer.TokenType.LTEQ)
+            match(Lexer.TokenType.LTEQ);
+        else if(nextLA(0) == Lexer.TokenType.LT)
+            match(Lexer.TokenType.LT);
+        else if(nextLA(0) == Lexer.TokenType.GT)
+            match(Lexer.TokenType.GT);
+        else if(nextLA(0) == Lexer.TokenType.GTEQ)
+            match(Lexer.TokenType.GTEQ);
+        else if(nextLA(0) == Lexer.TokenType.EQEQ)
+            match(Lexer.TokenType.EQEQ);
+        else if(nextLA(0) == Lexer.TokenType.LTGT)
+            match(Lexer.TokenType.LTGT);
+        else if(nextLA(0) == Lexer.TokenType.LTEQGT)
+            match(Lexer.TokenType.LTEQGT);
+        else if(nextLA(0) == Lexer.TokenType.MIN)
+            match(Lexer.TokenType.MIN);
+        else if(nextLA(0) == Lexer.TokenType.MAX)
+            match(Lexer.TokenType.MAX);
+        else if(nextLA(0) == Lexer.TokenType.PLUS)
+            match(Lexer.TokenType.PLUS);
+        else if(nextLA(0) == Lexer.TokenType.MINUS)
+            match(Lexer.TokenType.MINUS);
+        else if(nextLA(0) == Lexer.TokenType.MULT)
+            match(Lexer.TokenType.MULT);
+        else if(nextLA(0) == Lexer.TokenType.DIV)
+            match(Lexer.TokenType.DIV);
+        else if(nextLA(0) == Lexer.TokenType.MOD)
+            match(Lexer.TokenType.MOD);
+        else if(nextLA(0) == Lexer.TokenType.EXP)
+            match(Lexer.TokenType.EXP);
+        else throw new IllegalStateException("Error! Invalid Binary Operator");
     }
 
     // 26. unary-operator ::= - | not
     private void unaryOperator() {
-        if(checkType(Lexer.TokenType.MINUS))
+        if(nextLA(0) == Lexer.TokenType.MINUS)
             match(Lexer.TokenType.MINUS);
-        else if(checkType(Lexer.TokenType.NOT))
+        else if(nextLA(0) == Lexer.TokenType.NOT)
             match(Lexer.TokenType.NOT);
         else throw new IllegalStateException("Invalid Unary Operator!");
     }
@@ -457,9 +530,9 @@ public class Parser {
 
     // 27. function ::= (pure | recurs)? def function-header => return-type block-statement
     private void function() {
-        if(checkType(Lexer.TokenType.PURE))
+        if(nextLA(0) == Lexer.TokenType.PURE)
             match(Lexer.TokenType.PURE);
-        else if(checkType(Lexer.TokenType.RECURS))
+        else if(nextLA(0) == Lexer.TokenType.RECURS)
             match(Lexer.TokenType.RECURS);
 
         match(Lexer.TokenType.DEF);
@@ -477,15 +550,15 @@ public class Parser {
     private void functionHeader() {
         match(Lexer.TokenType.ID);
 
-        if(checkType(Lexer.TokenType.LT))
+        if(nextLA(0) == Lexer.TokenType.LT)
             functionTypeParams();
 
         match(Lexer.TokenType.LPAREN);
 
-        if( checkType(Lexer.TokenType.IN) ||
-            checkType(Lexer.TokenType.OUT) ||
-            checkType(Lexer.TokenType.INOUT) ||
-            checkType(Lexer.TokenType.REF))
+        if( nextLA(0) == Lexer.TokenType.IN ||
+            nextLA(0) == Lexer.TokenType.OUT ||
+            nextLA(0) == Lexer.TokenType.INOUT ||
+            nextLA(0) == Lexer.TokenType.REF)
                 formalParams();
 
         match(Lexer.TokenType.RPAREN);
@@ -496,7 +569,7 @@ public class Parser {
         match(Lexer.TokenType.LT);
         typeifier();
 
-        while(checkType(Lexer.TokenType.COMMA)) {
+        while(nextLA(0) == Lexer.TokenType.COMMA) {
             match(Lexer.TokenType.COMMA);
             typeifier();
         }
@@ -505,11 +578,11 @@ public class Parser {
 
     // 30. typeifier ::= (discr | scalar | class)? ID
     private void typeifier() {
-        if(checkType(Lexer.TokenType.DISCR))
+        if(nextLA(0) == Lexer.TokenType.DISCR)
             match(Lexer.TokenType.DISCR);
-        else if(checkType(Lexer.TokenType.SCALAR))
+        else if(nextLA(0) == Lexer.TokenType.SCALAR)
             match(Lexer.TokenType.SCALAR);
-        else if(checkType(Lexer.TokenType.CLASS))
+        else if(nextLA(0) == Lexer.TokenType.CLASS)
             match(Lexer.TokenType.CLASS);
 
         match(Lexer.TokenType.ID);
@@ -531,7 +604,7 @@ public class Parser {
     // 32. block-statement ::= {declaration* statement*}
     private void blockStatement() {
         match(Lexer.TokenType.LBRACE);
-        while(checkType(Lexer.TokenType.LOCAL) || checkType(Lexer.TokenType.DEF))
+        while(nextLA(0) == Lexer.TokenType.LOCAL || nextLA(0) == Lexer.TokenType.DEF)
             declaration();
 
         match(Lexer.TokenType.RBRACE);
@@ -539,15 +612,15 @@ public class Parser {
 
     // 33. declaration ::= local? variable-decl | ref variable-decl
     private void declaration() {
-        if(checkType(Lexer.TokenType.LOCAL))
-            match(Lexer.TokenType.LOCAL);
-
-        if(checkType(Lexer.TokenType.DEF)) {
-            match(Lexer.TokenType.DEF);
+        if(nextLA(0) == Lexer.TokenType.REF) {
+            match(Lexer.TokenType.REF);
             variableDecl();
         }
-        else if(checkType(Lexer.TokenType.REF)) {
-            match(Lexer.TokenType.REF);
+        else if(nextLA(0) == Lexer.TokenType.LOCAL)
+            match(Lexer.TokenType.LOCAL);
+
+        if(nextLA(0) == Lexer.TokenType.DEF) {
+            match(Lexer.TokenType.DEF);
             variableDecl();
         }
         else throw new IllegalStateException("Error Invalid Declaration!");
@@ -568,7 +641,6 @@ public class Parser {
     // 35. return-statement ::= return expression?
     private void returnStatement() {
         match(Lexer.TokenType.RETURN);
-
         // CALL expression
     }
 
@@ -582,7 +654,7 @@ public class Parser {
 
     // 37. argument-value ::= ref expression | expression
     private void argumentValue() {
-        if(checkType(Lexer.TokenType.REF)) {
+        if(nextLA(0) == Lexer.TokenType.REF) {
             match(Lexer.TokenType.REF);
             expression();
         }
@@ -595,16 +667,27 @@ public class Parser {
 
         expression();
         blockStatement();
+
+        while(nextLA(0) == Lexer.TokenType.ELSE && nextLA(1) == Lexer.TokenType.IF)
+            elseIfStatement();
+
+        if(nextLA(0) == Lexer.TokenType.ELSE)
+            blockStatement();
     }
 
     // 39. elseif-statement ::= else if expression block-statement
     private void elseIfStatement() {
-
+        match(Lexer.TokenType.ELSE);
+        match(Lexer.TokenType.IF);
+        expression();
+        blockStatement();
     }
 
     // 40. iterator-statement ::= for (range-iterator | array-iterator) block-statement
     private void iteratorStatement() {
+        match(Lexer.TokenType.FOR);
 
+        blockStatement();
     }
 
     // 41. range-iterator ::= ID in expression range-operator expression
@@ -619,7 +702,6 @@ public class Parser {
 
     // 43. range-operator ::= inclusive | exclusive-right | exclusive-left | exclusive
     private void rangeOperator() {
-
     }
 
     // 44. inclusive ::= ..
@@ -644,12 +726,32 @@ public class Parser {
 
     // 48. loop-statement ::= loop { declaration* statement* until (expression) statement* }
     private void loopStatement() {
+        match(Lexer.TokenType.LOOP);
+        match(Lexer.TokenType.LBRACE);
+        while(nextLA(0) == Lexer.TokenType.DEF ||
+              nextLA(0) == Lexer.TokenType.REF ||
+              nextLA(0) == Lexer.TokenType.LOCAL)
+                declaration();
 
+        // statements call
+        match(Lexer.TokenType.UNTIL);
+        match(Lexer.TokenType.LPAREN);
+        expression();
+        match(Lexer.TokenType.RPAREN);
+        //statements call
+        match(Lexer.TokenType.RBRACE);
     }
 
     // 49. choice-statement ::= choice expression { case-statement* other block-statement }
     private void choiceStatement() {
-
+        match(Lexer.TokenType.CHOICE);
+        expression();
+        match(Lexer.TokenType.LBRACE);
+        while(nextLA(0) == Lexer.TokenType.ON)
+            caseStatement();
+        match(Lexer.TokenType.OTHER);
+        blockStatement();
+        match(Lexer.TokenType.RBRACE);
     }
 
     // 50. case-statement ::= on label block-statement
@@ -661,12 +763,20 @@ public class Parser {
 
     // 51. label ::= constant (.. constant)?
     private void label() {
-
+        constant();
+        if(nextLA(0) == Lexer.TokenType.INC) {
+            match(Lexer.TokenType.INC);
+            constant();
+        }
     }
 
     // 52. list-command-statement ::= append (argument-list) | remove (argument-list) | insert (argument-list)
     private void listCommandStatement() {
-
+        if(nextLA(0) == Lexer.TokenType.APPEND) {
+            match(Lexer.TokenType.APPEND);
+            match(Lexer.TokenType.LPAREN);
+            //argumentList();
+        }
     }
 
     // 53. input-output-statement ::= input-statement | output-statement
@@ -682,68 +792,196 @@ public class Parser {
 
     // 54. expression ::= and-expression ( or and-expression)*
     private void expression() {
-
+        andExpression();
+        while(nextLA(0) == Lexer.TokenType.OR) {
+            match(Lexer.TokenType.OR);
+            andExpression();
+        }
     }
 
     // 55. and-expression ::= equal-expression ( and equal-expression)*
     private void andExpression() {
-
+        equalExpression();
+        while(nextLA(0) == Lexer.TokenType.AND) {
+            match(Lexer.TokenType.AND);
+            equalExpression();
+        }
     }
 
     // 56. equal-expression ::= relational-expression ((== | <>) relational-expression)*
     private void equalExpression() {
-
+        relationalExpression();
+        while(nextLA(0) == Lexer.TokenType.EQEQ ||
+              nextLA(0) == Lexer.TokenType.NEQ) {
+                if(nextLA(0) == Lexer.TokenType.EQEQ) {
+                    match(Lexer.TokenType.EQEQ);
+                    relationalExpression();
+                }
+                else if(nextLA(0) == Lexer.TokenType.NEQ) {
+                    match(Lexer.TokenType.NEQ);
+                    relationalExpression();
+                }
+        }
     }
 
     // 57. relational-expression ::= minmax-expression (relational-operator minmax-expression)*
     private void relationalExpression() {
-
+        minMaxExpression();
+        while(nextLA(0) == Lexer.TokenType.LTEQ ||
+              nextLA(0) == Lexer.TokenType.LT ||
+              nextLA(0) == Lexer.TokenType.GT ||
+              nextLA(0) == Lexer.TokenType.GTEQ ||
+              nextLA(0) == Lexer.TokenType.LTEQGT ||
+              nextLA(0) == Lexer.TokenType.INSTANCEOF) {
+            relationalOperator();
+            minMaxExpression();
+        }
     }
 
     // 58. relational-operator ::= <= | < | > | >= | <=> | instanceof
     private void relationalOperator() {
-
+        if(nextLA(0) == Lexer.TokenType.LTEQ)
+            match(Lexer.TokenType.LTEQ);
+        else if(nextLA(0) == Lexer.TokenType.LT)
+            match(Lexer.TokenType.LT);
+        else if(nextLA(0) == Lexer.TokenType.GT)
+            match(Lexer.TokenType.GT);
+        else if(nextLA(0) == Lexer.TokenType.GTEQ)
+            match(Lexer.TokenType.GTEQ);
+        else if(nextLA(0) == Lexer.TokenType.LTEQGT)
+            match(Lexer.TokenType.LTEQGT);
+        else if(nextLA(0) == Lexer.TokenType.INSTANCEOF)
+            match(Lexer.TokenType.INSTANCEOF);
+        else throw new IllegalStateException("Error! Invalid Relational Operator!");
     }
 
     // 59. minmax-expression ::= additive-expression ( (<: | :>) additive-expression)*
     private void minMaxExpression() {
-
+        additiveExpression();
+        while(nextLA(0) == Lexer.TokenType.MIN||
+                nextLA(0) == Lexer.TokenType.MAX) {
+            if(nextLA(0) == Lexer.TokenType.MIN) {
+                match(Lexer.TokenType.MIN);
+                additiveExpression();
+            }
+            else if(nextLA(0) == Lexer.TokenType.MAX) {
+                match(Lexer.TokenType.MAX);
+                additiveExpression();
+            }
+        }
     }
 
     // 60. additive-expression ::= multiplicative-expression ( (+ | -) multiplicative-expression)*
     private void additiveExpression() {
-
+        multiplicativeExpression();
+        while(nextLA(0) == Lexer.TokenType.PLUS ||
+              nextLA(0) == Lexer.TokenType.MINUS) {
+                if(nextLA(0) == Lexer.TokenType.PLUS) {
+                    match(Lexer.TokenType.PLUS);
+                    multiplicativeExpression();
+                }
+                else if(nextLA(0) == Lexer.TokenType.MINUS) {
+                    match(Lexer.TokenType.MINUS);
+                    multiplicativeExpression();
+                }
+        }
     }
 
     // 61. multiplicative-expression ::= power-expression ( (*|/|%) power-expression)*
     private void multiplicativeExpression() {
-
+        powerExpression();
+        while(nextLA(0) == Lexer.TokenType.MULT ||
+              nextLA(0) == Lexer.TokenType.DIV  ||
+              nextLA(0) == Lexer.TokenType.MOD) {
+                if(nextLA(0) == Lexer.TokenType.MULT) {
+                    match(Lexer.TokenType.MULT);
+                    powerExpression();
+                }
+                else if(nextLA(0) == Lexer.TokenType.DIV) {
+                    match(Lexer.TokenType.DIV);
+                    powerExpression();
+                }
+                else if(nextLA(0) == Lexer.TokenType.MOD) {
+                    match(Lexer.TokenType.MOD);
+                    powerExpression();
+                }
+        }
     }
 
     // 62. power-expression ::= unary-expression (** unary-expression)*
     private void powerExpression() {
-
+        unaryExpression();
+        while(nextLA(0) == Lexer.TokenType.EXP) {
+            match(Lexer.TokenType.EXP);
+            unaryExpression();
+        }
     }
 
     // 63. unary-expression ::= (- | not) unary-expression | factor-expression
     private void unaryExpression() {
-
+        if(nextLA(0) == Lexer.TokenType.MINUS) {
+            match(Lexer.TokenType.MINUS);
+            unaryExpression();
+        }
+        else if(nextLA(0) == Lexer.TokenType.NOT) {
+            match(Lexer.TokenType.NOT);
+            unaryExpression();
+        }
+        else
+            factorExpression();
     }
 
     // 64. factor-expression ::= call-expression | uninit? (expression) | length (expression)
     //                         | slice (expression, expression range-operator expression) | cast (type, expression)
     private void factorExpression() {
+       // if(nextLA(0) == Lexer.TokenType.UNINIT || nextLA(0) == Lexer.TokenType.LPAREN)
 
+        if(nextLA(0) == Lexer.TokenType.LENGTH) {
+            match(Lexer.TokenType.LENGTH);
+            match(Lexer.TokenType.LPAREN);
+            expression();
+            match(Lexer.TokenType.RPAREN);
+        }
+        else if(nextLA(0) == Lexer.TokenType.SLICE) {
+            match(Lexer.TokenType.SLICE);
+            match(Lexer.TokenType.LPAREN);
+
+            expression();
+            match(Lexer.TokenType.COMMA);
+
+            expression();
+            rangeOperator();
+            expression();
+            match(Lexer.TokenType.RPAREN);
+        }
+        else if(nextLA(0) == Lexer.TokenType.CAST) {
+            match(Lexer.TokenType.CAST);
+            match(Lexer.TokenType.LPAREN);
+            type();
+
+            match(Lexer.TokenType.COMMA);
+            expression();
+
+            match(Lexer.TokenType.RPAREN);
+        }
     }
 
-    // 65. call-expression ::= primary ((argument-list?) | . ID | [expression])*
+    // 65. call-expression ::= primary ( (argument-list?) | . ID | [expression])*
     private void callExpression() {
+        primary();
 
     }
 
     // 66. primary ::= ID | constant | (expression)
     private void primary() {
+        if(nextLA(0) == Lexer.TokenType.ID)
+            match(Lexer.TokenType.ID);
 
+        else if(nextLA(0) == Lexer.TokenType.LPAREN) {
+            match(Lexer.TokenType.LPAREN);
+            expression();
+            match(Lexer.TokenType.RPAREN);
+        }
     }
 
     /*
@@ -754,12 +992,32 @@ public class Parser {
 
     // 67. constant ::= object-constant | array-constant | list-constant | tuple-constant | scalar-constant
     private void constant() {
-
+        if(nextLA(0) == Lexer.TokenType.ID)
+            objectConstant();
+        else if(nextLA(0) == Lexer.TokenType.ARRAY ||
+                nextLA(0) == Lexer.TokenType.LBRACK)
+            arrayConstant();
+        else if(nextLA(0) == Lexer.TokenType.LIST ||
+                nextLA(0) == Lexer.TokenType.LBRACE)
+            listConstant();
+        else if(nextLA(0) == Lexer.TokenType.TUPLE ||
+                nextLA(0) == Lexer.TokenType.LPAREN)
+            tupleConstant();
+        else
+            scalarConstant();
     }
 
-    // 68. object-constant ::= ID (object-field (, object-field)*)
+    // 68. object-constant ::= ID ( object-field (, object-field)* )
     private void objectConstant() {
+        match(Lexer.TokenType.ID);
+        match(Lexer.TokenType.LPAREN);
 
+        objectField();
+        while(nextLA(0) == Lexer.TokenType.COMMA) {
+            match(Lexer.TokenType.COMMA);
+            objectField();
+        }
+        match(Lexer.TokenType.RPAREN);
     }
 
     // 69. object-field ::= ID = expression
@@ -787,12 +1045,25 @@ public class Parser {
 
     // 73. scalar-constant ::= discrete-constant | STRING-LITERAL | TEXT-LITERAL | REAL-LITERAL
     private void scalarConstant() {
-
+        if(nextLA(0) == Lexer.TokenType.STR_LIT)
+            match(Lexer.TokenType.STR_LIT);
+        else if(nextLA(0) == Lexer.TokenType.TEXT_LIT)
+            match(Lexer.TokenType.TEXT_LIT);
+        else if(nextLA(0) == Lexer.TokenType.REAL_LIT)
+            match(Lexer.TokenType.REAL_LIT);
+        else
+            discreteConstant();
     }
 
     // 74. discrete-constant ::= INT-LITERAL | CHAR-LITERAL | BOOL-LITERAL
     private void discreteConstant() {
-
+        if(nextLA(0) == Lexer.TokenType.INT_LIT)
+            match(Lexer.TokenType.INT_LIT);
+        else if(nextLA(0) == Lexer.TokenType.CHAR_LIT)
+            match(Lexer.TokenType.CHAR_LIT);
+        else if(nextLA(0) == Lexer.TokenType.BOOL_LIT)
+            match(Lexer.TokenType.BOOL_LIT);
+        else throw new IllegalStateException("Error! Invalid Constant!");
     }
 
     /*

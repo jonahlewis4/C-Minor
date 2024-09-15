@@ -4,10 +4,7 @@ package Lexer;
 ---------------------------------------------------
                         ISSUES
 ---------------------------------------------------
-
-1. How to keep track of columns if user goes to a new line (aka STR_LIT) last column last line
-2. Can strings have double quotes ? single quote
-3. Error Messages
+                        N/A
  */
 
 public class Lexer {
