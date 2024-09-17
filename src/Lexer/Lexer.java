@@ -15,7 +15,7 @@ public class Lexer {
     private int line;           // Line Number
     private int col;            // Column Number
 
-    // There are currently 104 possible different tokens
+    // There are currently 105 possible different tokens
     public enum TokenType {
         EOF,        // $
         ERROR,      // Error
@@ -119,6 +119,7 @@ public class Lexer {
         DIV,        // /
         MOD,        // %
         EXP,        // **
+        TILDE,      // ~
         EQEQ,       // ==
         NEQ,        // !=
         LT,         // <
@@ -231,6 +232,9 @@ public class Lexer {
                         break;
                     }
                     return new Token(TokenType.DIV, "/", lineStart, line, colStart, col);
+                case '~':
+                    consume();
+                    return new Token(TokenType.TILDE, "~", lineStart, line, colStart, col);
                 case '%':
                     consume();
                     return new Token(TokenType.MOD, "%", lineStart, line, colStart, col);
