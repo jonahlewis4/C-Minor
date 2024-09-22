@@ -10,12 +10,14 @@ package Lexer;
 public class Lexer {
 
     private final String file;  // Program
-    private int currPos = 0;    // Position in file
+    private int currPos;        // Position in file
     private char lookChar;      // Current lookahead
     private int line;           // Line Number
     private int col;            // Column Number
+    private int lineStart;      // Starting Line
+    private int colStart;       // Starting Column
 
-    // There are currently 105 possible different tokens
+    // There are currently 110 possible different tokens
     public enum TokenType {
         EOF,        // $
         ERROR,      // Error
@@ -23,18 +25,21 @@ public class Lexer {
 
         /*
         -----------------------------
-                  Keywords
+                   KEYWORDS
         -----------------------------
          */
         ABSTR,      // abstr
         APPEND,     // append
         ARRAY,      // Array
         BOOL,       // Bool
+        CALL,       // call
         CAST,       // cast
         CHAR,       // Char
         CHOICE,     // choice
+        CIN,        // cin
         CLASS,      // class
         CONST,      // const
+        COUT,       // cout
         DEF,        // def
         DISCR,      // discr
         DO,         // do
@@ -51,7 +56,7 @@ public class Lexer {
         INCLUDE,    // #include
         INT,        // Int
         INHERITS,   // inherits
-        INOUT,      // inout        | in out??
+        INOUT,      // inout
         INREV,      // inrev
         INSERT,     // insert
         LENGTH,     // length
@@ -92,12 +97,14 @@ public class Lexer {
 
         /*
         -----------------------------
-                  Literals
+                   LITERALS
         -----------------------------
-         */
-        // letter = a | ... | z | A | ... | Z
-        // digit = 0 | ... | 9
-        // letter-digit = letter | digit
+        */
+            /*
+                letter = a | ... | z | A | ... | Z
+                digit = 0 | ... | 9
+                letter-digit = letter | digit
+            */
         ID,         // letter letter-digit*
         INT_LIT,    // digit+
         REAL_LIT,   // digit digit* . digit+ | . digit+
@@ -109,7 +116,7 @@ public class Lexer {
 
         /*
         -----------------------------
-                  Operators
+                  OPERATORS
         -----------------------------
          */
         EQ,         // =
@@ -134,11 +141,13 @@ public class Lexer {
         INSTANCEOF, // instanceof
         AND,        // and
         OR,         // or
+        SI,         // <<
+        SE,         // >>
 
 
         /*
         -----------------------------
-                  Separators
+                  SEPARATORS
         -----------------------------
          */
         LPAREN,     // (
@@ -153,13 +162,15 @@ public class Lexer {
         AT,         // @
     }
 
-    public static final char EOF = (char) -1;
+    public static final char EOF = '\0';
 
     public Lexer(final String file) {
         this.file = file;
+        this.currPos = 0;
         this.lookChar = file.charAt(currPos);
         this.line = 1;
         this.col = 0;
+        this.lineStart = this.colStart = 0;
     }
 
     private void consume() {
@@ -171,8 +182,8 @@ public class Lexer {
             lookChar = EOF;
     }
 
-    private boolean match(char charToCheck) {
-        if(lookChar != charToCheck)
+    private boolean match(char expectedChar) {
+        if(lookChar != expectedChar)
             return false;
         consume();
         return true;
@@ -197,9 +208,9 @@ public class Lexer {
 
     public Token nextToken() {
         while(lookChar != EOF) {
-            // Get starting line/column, maybe make as globals?
-            int lineStart = line;
-            int colStart = col;
+            // Store the starting line/column before figuring out token
+            lineStart = line;
+            colStart = col;
             switch(lookChar) {
                 case ' ', '\t', '\r':
                     consumeWhitespace();
@@ -259,11 +270,17 @@ public class Lexer {
                     if(match(':'))
                         return new Token(TokenType.MIN, "<:", lineStart, line, colStart, col);
 
+                    if(match('<'))
+                        return new Token(TokenType.SI, "<<", lineStart, line, colStart, col);
+
                     return new Token(TokenType.LT, "<", lineStart, line, colStart, col);
                 case '>':
                     consume();
                     if(match('='))
                         return new Token(TokenType.GTEQ, ">=", lineStart, line, colStart, col);
+
+                    if(match('>'))
+                        return new Token(TokenType.SE, ">>", lineStart, line, colStart, col);
 
                     return new Token(TokenType.GT, ">", lineStart, line, colStart, col);
                 case ':':
@@ -322,22 +339,13 @@ public class Lexer {
     }
 
     private boolean isLetter() {
-        if((lookChar < 'a' || lookChar > 'z') && (lookChar < 'A' || lookChar > 'Z'))
-            return false;
-        return true;
+        return ((lookChar >= 'A' && lookChar <= 'Z')
+                || (lookChar >= 'a' && lookChar <= 'z'));
     }
 
-    private boolean isDigit() {
-        if(lookChar < '0' || lookChar > '9')
-            return false;
-        return true;
-    }
+    private boolean isDigit() { return (lookChar >= '0' && lookChar <= '9'); }
 
-    private boolean isEOF() {
-        if(currPos != file.length())
-            return false;
-        return true;
-    }
+    private boolean isEOF() { return currPos != file.length(); }
 
     private Token charLit(int lineStart, int colStart) {
         StringBuilder newChar = new StringBuilder();
@@ -406,11 +414,14 @@ public class Lexer {
             case "append" -> new Token(TokenType.APPEND, "append", lineStart, line, colStart, col);
             case "Array" -> new Token(TokenType.ARRAY, "Array", lineStart, line, colStart, col);
             case "Bool" -> new Token(TokenType.BOOL, "Bool", lineStart, line, colStart, col);
+            case "call" -> new Token(TokenType.CALL, "call", lineStart, line, colStart, col);
             case "cast" -> new Token(TokenType.CAST, "cast", lineStart, line, colStart, col);
             case "Char" -> new Token(TokenType.CHAR, "Char", lineStart, line, colStart, col);
             case "choice" -> new Token(TokenType.CHOICE, "choice", lineStart, line, colStart, col);
+            case "cin" -> new Token(TokenType.CIN, "cin", lineStart, line, colStart, col);
             case "class" -> new Token(TokenType.CLASS, "class", lineStart, line, colStart, col);
             case "const" -> new Token(TokenType.CONST, "const", lineStart, line, colStart, col);
+            case "cout" -> new Token(TokenType.COUT, "cout", lineStart, line, colStart, col);
             case "def" -> new Token(TokenType.DEF, "def", lineStart, line, colStart, col);
             case "discr" -> new Token(TokenType.DISCR, "discr", lineStart, line, colStart, col);
             case "do" -> new Token(TokenType.DO, "do", lineStart, line, colStart, col);
