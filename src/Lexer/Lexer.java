@@ -17,7 +17,7 @@ public class Lexer {
     private int lineStart;      // Starting Line
     private int colStart;       // Starting Column
 
-    // There are currently 110 possible different tokens
+    // There are currently 109 possible different tokens
     public enum TokenType {
         EOF,        // $
         ERROR,      // Error
@@ -32,7 +32,6 @@ public class Lexer {
         APPEND,     // append
         ARRAY,      // Array
         BOOL,       // Bool
-        CALL,       // call
         CAST,       // cast
         CHAR,       // Char
         CHOICE,     // choice
@@ -78,13 +77,13 @@ public class Lexer {
         PUBLIC,     // public
         PURE,       // pure
         REAL,       // Real
-        REASSIGN,   // Reassign
         RECURS,     // recurs
         REF,        // ref
         REMOVE,     // remove
         RENAME,     // rename
         RETURN,     // return
         SCALAR,     // scalar
+        SET,        // set
         SLICE,      // slice
         STOP,       // stop
         STRING,     // String
@@ -345,7 +344,7 @@ public class Lexer {
 
     private boolean isDigit() { return (lookChar >= '0' && lookChar <= '9'); }
 
-    private boolean isEOF() { return currPos != file.length(); }
+    private boolean isEOF() { return currPos == file.length(); }
 
     private Token charLit(int lineStart, int colStart) {
         StringBuilder newChar = new StringBuilder();
@@ -354,8 +353,10 @@ public class Lexer {
             if(lookChar ==  'n' || lookChar == 'r' || lookChar == 't' || lookChar == '0')
                 newChar.append('\\');
 
-        newChar.append(lookChar);
-        consume();
+        if(isLetter()) {
+            newChar.append(lookChar);
+            consume();
+        }
 
         if(!match('\''))
             return strLit(newChar, lineStart, colStart);
@@ -414,7 +415,6 @@ public class Lexer {
             case "append" -> new Token(TokenType.APPEND, "append", lineStart, line, colStart, col);
             case "Array" -> new Token(TokenType.ARRAY, "Array", lineStart, line, colStart, col);
             case "Bool" -> new Token(TokenType.BOOL, "Bool", lineStart, line, colStart, col);
-            case "call" -> new Token(TokenType.CALL, "call", lineStart, line, colStart, col);
             case "cast" -> new Token(TokenType.CAST, "cast", lineStart, line, colStart, col);
             case "Char" -> new Token(TokenType.CHAR, "Char", lineStart, line, colStart, col);
             case "choice" -> new Token(TokenType.CHOICE, "choice", lineStart, line, colStart, col);
@@ -460,13 +460,13 @@ public class Lexer {
             case "public" -> new Token(TokenType.PUBLIC, "public", lineStart, line, colStart, col);
             case "pure" -> new Token(TokenType.PURE, "pure", lineStart, line, colStart, col);
             case "Real" -> new Token(TokenType.REAL, "Real", lineStart, line, colStart, col);
-            case "reassign" -> new Token(TokenType.REASSIGN, "reassign", lineStart, line, colStart, col);
             case "recurs" -> new Token(TokenType.RECURS, "recurs", lineStart, line, colStart, col);
             case "ref" -> new Token(TokenType.REF, "ref", lineStart, line, colStart, col);
             case "remove" -> new Token(TokenType.REMOVE, "remove", lineStart, line, colStart, col);
             case "rename" -> new Token(TokenType.RENAME, "rename", lineStart, line, colStart, col);
             case "return" -> new Token(TokenType.RETURN, "return", lineStart, line, colStart, col);
             case "scalar" -> new Token(TokenType.SCALAR, "scalar", lineStart, line, colStart, col);
+            case "set" -> new Token(TokenType.SET, "set", lineStart, line, colStart, col);
             case "slice" -> new Token(TokenType.SLICE, "slice", lineStart, line, colStart, col);
             case "stop" -> new Token(TokenType.STOP, "stop", lineStart, line, colStart, col);
             case "String" -> new Token(TokenType.STRING, "String", lineStart, line, colStart, col);
