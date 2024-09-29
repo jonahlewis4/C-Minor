@@ -17,7 +17,7 @@ public class Lexer {
     private int lineStart;      // Starting Line
     private int colStart;       // Starting Column
 
-    // There are currently 109 possible different tokens
+    // There are currently 111 possible different tokens
     public enum TokenType {
         EOF,        // $
         ERROR,      // Error
@@ -44,7 +44,6 @@ public class Lexer {
         DO,         // do
         ELSE,       // else
         ENDL,       // endl
-        ENUM,       // Enum
         EXCEPT,     // except
         EXCLUDE,    // #exclude
         FINAL,      // final
@@ -64,6 +63,7 @@ public class Lexer {
         LOOP,       // loop
         MAIN,       // main
         METHOD,     // method
+        NEW,        // new
         NOT,        // not
         ON,         // on
         ONLY,       // only
@@ -73,6 +73,7 @@ public class Lexer {
         OVERLOAD,   // overload
         OVERRIDE,   // override
         PARENT,     // parent
+        PROPERTY,   // property
         PROTECTED,  // protected
         PUBLIC,     // public
         PURE,       // pure
@@ -89,6 +90,7 @@ public class Lexer {
         STRING,     // String
         THEN,       // then
         TUPLE,      // Tuple
+        TYPE,       // type
         UNINIT,     // uninit
         UNTIL,      // until
         VOID,       // Void
@@ -427,7 +429,6 @@ public class Lexer {
             case "do" -> new Token(TokenType.DO, "do", lineStart, line, colStart, col);
             case "else" -> new Token(TokenType.ELSE, "else", lineStart, line, colStart, col);
             case "endl" -> new Token(TokenType.ENDL, "endl", lineStart, line, colStart, col);
-            case "Enum" -> new Token(TokenType.ENUM, "Enum", lineStart, line, colStart, col);
             case "except" -> new Token(TokenType.EXCEPT, "except", lineStart, line, colStart, col);
             case "final" -> new Token(TokenType.FINAL, "final", lineStart, line, colStart, col);
             case "for" -> new Token(TokenType.FOR, "for", lineStart, line, colStart, col);
@@ -446,6 +447,7 @@ public class Lexer {
             case "loop" -> new Token(TokenType.LOOP, "loop", lineStart, line, colStart, col);
             case "main" -> new Token(TokenType.MAIN, "main", lineStart, line, colStart, col);
             case "method" -> new Token(TokenType.METHOD, "method", lineStart, line, colStart, col);
+            case "new" -> new Token(TokenType.NEW, "new", lineStart, line, colStart, col);
             case "not" -> new Token(TokenType.NOT, "not", lineStart, line, colStart, col);
             case "on" -> new Token(TokenType.ON, "on", lineStart, line, colStart, col);
             case "only" -> new Token(TokenType.ONLY, "only", lineStart, line, colStart, col);
@@ -456,6 +458,7 @@ public class Lexer {
             case "overload" -> new Token(TokenType.OVERLOAD, "overload", lineStart, line, colStart, col);
             case "override" -> new Token(TokenType.OVERRIDE, "override", lineStart, line, colStart, col);
             case "parent" -> new Token(TokenType.PARENT, "parent", lineStart, line, colStart, col);
+            case "property" -> new Token(TokenType.PROPERTY, "property", lineStart, line, colStart, col);
             case "protected" -> new Token(TokenType.PROTECTED, "protected", lineStart, line, colStart, col);
             case "public" -> new Token(TokenType.PUBLIC, "public", lineStart, line, colStart, col);
             case "pure" -> new Token(TokenType.PURE, "pure", lineStart, line, colStart, col);
@@ -472,6 +475,7 @@ public class Lexer {
             case "String" -> new Token(TokenType.STRING, "String", lineStart, line, colStart, col);
             case "then" -> new Token(TokenType.THEN, "then", lineStart, line, colStart, col);
             case "Tuple" -> new Token(TokenType.TUPLE, "Tuple", lineStart, line, colStart, col);
+            case "type" -> new Token(TokenType.TYPE, "type", lineStart, line, colStart, col);
             case "uninit" -> new Token(TokenType.UNINIT, "uninit", lineStart, line, colStart, col);
             case "until" -> new Token(TokenType.UNTIL, "until", lineStart, line, colStart, col);
             case "Void" -> new Token(TokenType.VOID, "Void", lineStart, line, colStart, col);
