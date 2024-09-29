@@ -17,7 +17,7 @@ public class Lexer {
     private int lineStart;      // Starting Line
     private int colStart;       // Starting Column
 
-    // There are currently 111 possible different tokens
+    // There are currently 114 possible different tokens
     public enum TokenType {
         EOF,        // $
         ERROR,      // Error
@@ -142,6 +142,9 @@ public class Lexer {
         INSTANCEOF, // instanceof
         AND,        // and
         OR,         // or
+        BIT_AND,    // &
+        BIT_OR,     // |
+        XOR,        // ^
         SI,         // <<
         SE,         // >>
 
@@ -327,6 +330,15 @@ public class Lexer {
                     if(match('\'') && match('\''))
                         return strLit(new StringBuilder(), lineStart, colStart);
                     return charLit(lineStart, colStart);
+                case '|':
+                    consume();
+                    return new Token(TokenType.BIT_OR, "|", lineStart, line, colStart, col);
+                case '&':
+                    consume();
+                    return new Token(TokenType.BIT_AND, "&", lineStart, line, colStart, col);
+                case '^':
+                    consume();
+                    return new Token(TokenType.XOR, "^", lineStart, line, colStart, col);
                 default:
                     if(isLetter() || match('#'))
                         return name(lineStart, colStart);
