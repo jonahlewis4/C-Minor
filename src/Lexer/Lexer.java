@@ -1,4 +1,6 @@
 package Lexer;
+import AST.Token;
+import AST.Token.TokenType;
 
 /*
 ---------------------------------------------------
@@ -16,155 +18,6 @@ public class Lexer {
     private int col;            // Column Number
     private int lineStart;      // Starting Line
     private int colStart;       // Starting Column
-
-    // There are currently 114 possible different tokens
-    public enum TokenType {
-        EOF,        // $
-        ERROR,      // Error
-
-
-        /*
-        -----------------------------
-                   KEYWORDS
-        -----------------------------
-         */
-        ABSTR,      // abstr
-        APPEND,     // append
-        ARRAY,      // Array
-        BOOL,       // Bool
-        CAST,       // cast
-        CHAR,       // Char
-        CHOICE,     // choice
-        CIN,        // cin
-        CLASS,      // class
-        CONST,      // const
-        COUT,       // cout
-        DEF,        // def
-        DISCR,      // discr
-        DO,         // do
-        ELSE,       // else
-        ENDL,       // endl
-        EXCEPT,     // except
-        EXCLUDE,    // #exclude
-        FINAL,      // final
-        FOR,        // for
-        GLOBAL,     // global
-        IF,         // if
-        IN,         // in
-        INCLUDE,    // #include
-        INT,        // Int
-        INHERITS,   // inherits
-        INOUT,      // inout
-        INREV,      // inrev
-        INSERT,     // insert
-        LENGTH,     // length
-        LIST,       // List
-        LOCAL,      // local
-        LOOP,       // loop
-        MAIN,       // main
-        METHOD,     // method
-        NEW,        // new
-        NOT,        // not
-        ON,         // on
-        ONLY,       // only
-        OPERATOR,   // operator
-        OTHER,      // other
-        OUT,        // out
-        OVERLOAD,   // overload
-        OVERRIDE,   // override
-        PARENT,     // parent
-        PROPERTY,   // property
-        PROTECTED,  // protected
-        PUBLIC,     // public
-        PURE,       // pure
-        REAL,       // Real
-        RECURS,     // recurs
-        REF,        // ref
-        REMOVE,     // remove
-        RENAME,     // rename
-        RETURN,     // return
-        SCALAR,     // scalar
-        SET,        // set
-        SLICE,      // slice
-        STOP,       // stop
-        STRING,     // String
-        THEN,       // then
-        TUPLE,      // Tuple
-        TYPE,       // type
-        UNINIT,     // uninit
-        UNTIL,      // until
-        VOID,       // Void
-
-
-        /*
-        -----------------------------
-                   LITERALS
-        -----------------------------
-        */
-            /*
-                letter = a | ... | z | A | ... | Z
-                digit = 0 | ... | 9
-                letter-digit = letter | digit
-            */
-        ID,         // letter letter-digit*
-        INT_LIT,    // digit+
-        REAL_LIT,   // digit digit* . digit+ | . digit+
-        CHAR_LIT,   // 'char'
-        STR_LIT,    // 'char*'
-        TEXT_LIT,   // '''char*'''
-        BOOL_LIT,   // true || false
-
-
-        /*
-        -----------------------------
-                  OPERATORS
-        -----------------------------
-         */
-        EQ,         // =
-        PLUS,       // +
-        MINUS,      // -
-        MULT,       // *
-        DIV,        // /
-        MOD,        // %
-        EXP,        // **
-        TILDE,      // ~
-        EQEQ,       // ==
-        NEQ,        // !=
-        LT,         // <
-        LTEQ,       // <=
-        GT,         // >
-        GTEQ,       // >=
-        LTGT,       // <>
-        LTEQGT,     // <=>
-        MIN,        // <:
-        MAX,        // :>
-        INC,        // ..
-        INSTANCEOF, // instanceof
-        AND,        // and
-        OR,         // or
-        BIT_AND,    // &
-        BIT_OR,     // |
-        XOR,        // ^
-        SI,         // <<
-        SE,         // >>
-
-
-        /*
-        -----------------------------
-                  SEPARATORS
-        -----------------------------
-         */
-        LPAREN,     // (
-        RPAREN,     // )
-        LBRACE,     // {
-        RBRACE,     // }
-        LBRACK,     // [
-        RBRACK,     // ]
-        COLON,      // :
-        PERIOD,     // .
-        COMMA,      // ,
-        AT,         // @
-    }
 
     public static final char EOF = '\0';
 
@@ -226,18 +79,30 @@ public class Lexer {
                     consume();
                     if(match('='))
                         return new Token(TokenType.EQEQ, "==", lineStart, line, colStart, col);
-
+                    if(match('>'))
+                        return new Token(TokenType.ARROW, "=>", lineStart, line, colStart, col);
                     return new Token(TokenType.EQ, "=", lineStart, line, colStart, col);
                 case '+':
                     consume();
+                    if(match('='))
+                        return new Token(TokenType.PLUSEQ, "+=", lineStart, line, colStart, col);
                     return new Token(TokenType.PLUS, "+", lineStart, line, colStart, col);
                 case '-':
                     consume();
+                    if(match('='))
+                        return new Token(TokenType.MINUSEQ, "-=", lineStart, line, colStart, col);
                     return new Token(TokenType.MINUS, "-", lineStart, line, colStart, col);
                 case '*':
                     consume();
-                    if(match('*'))
+                    if(match('*')) {
+                        if(match('='))
+                            return new Token(TokenType.EXPEQ, "**=", lineStart, line, colStart, col);
+
                         return new Token(TokenType.EXP, "**", lineStart, line, colStart, col);
+                    }
+
+                    if(match('='))
+                        return new Token(TokenType.MULTEQ, "*=", lineStart, line, colStart, col);
 
                     return new Token(TokenType.MULT, "*", lineStart, line, colStart, col);
                 case '/':
@@ -246,12 +111,18 @@ public class Lexer {
                         consumeComment();
                         break;
                     }
+                    if(match('='))
+                        return new Token(TokenType.DIVEQ, "/=", lineStart, line, colStart, col);
+
                     return new Token(TokenType.DIV, "/", lineStart, line, colStart, col);
                 case '~':
                     consume();
                     return new Token(TokenType.TILDE, "~", lineStart, line, colStart, col);
                 case '%':
                     consume();
+                    if(match('='))
+                        return new Token(TokenType.MODEQ, "%=", lineStart, line, colStart, col);
+
                     return new Token(TokenType.MOD, "%", lineStart, line, colStart, col);
                 case '!':
                     consume();
@@ -263,7 +134,7 @@ public class Lexer {
                     consume();
                     if(match('=')) {
                         if(match('>'))
-                            return new Token(TokenType.LTEQGT, "<=>", lineStart, line, colStart, col);
+                            return new Token(TokenType.UFO, "<=>", lineStart, line, colStart, col);
 
                         return new Token(TokenType.LTEQ, "<=", lineStart, line, colStart, col);
                     }
@@ -275,7 +146,7 @@ public class Lexer {
                         return new Token(TokenType.MIN, "<:", lineStart, line, colStart, col);
 
                     if(match('<'))
-                        return new Token(TokenType.SI, "<<", lineStart, line, colStart, col);
+                        return new Token(TokenType.SLEFT, "<<", lineStart, line, colStart, col);
 
                     return new Token(TokenType.LT, "<", lineStart, line, colStart, col);
                 case '>':
@@ -284,7 +155,7 @@ public class Lexer {
                         return new Token(TokenType.GTEQ, ">=", lineStart, line, colStart, col);
 
                     if(match('>'))
-                        return new Token(TokenType.SE, ">>", lineStart, line, colStart, col);
+                        return new Token(TokenType.SRIGHT, ">>", lineStart, line, colStart, col);
 
                     return new Token(TokenType.GT, ">", lineStart, line, colStart, col);
                 case ':':
@@ -330,12 +201,17 @@ public class Lexer {
                     if(match('\'') && match('\''))
                         return strLit(new StringBuilder(), lineStart, colStart);
                     return charLit(lineStart, colStart);
+                case '?':
+                    consume();
+                    if(match('.'))
+                        return new Token(TokenType.ELVIS, "?.", lineStart, line, colStart, col);
+                    else return new Token(TokenType.ERROR, "ERROR", lineStart, line, colStart, col);
                 case '|':
                     consume();
-                    return new Token(TokenType.BIT_OR, "|", lineStart, line, colStart, col);
+                    return new Token(TokenType.BOR, "|", lineStart, line, colStart, col);
                 case '&':
                     consume();
-                    return new Token(TokenType.BIT_AND, "&", lineStart, line, colStart, col);
+                    return new Token(TokenType.BAND, "&", lineStart, line, colStart, col);
                 case '^':
                     consume();
                     return new Token(TokenType.XOR, "^", lineStart, line, colStart, col);
@@ -460,6 +336,7 @@ public class Lexer {
             case "main" -> new Token(TokenType.MAIN, "main", lineStart, line, colStart, col);
             case "method" -> new Token(TokenType.METHOD, "method", lineStart, line, colStart, col);
             case "new" -> new Token(TokenType.NEW, "new", lineStart, line, colStart, col);
+            case "next" -> new Token(TokenType.NEXT, "next", lineStart, line, colStart, col);
             case "not" -> new Token(TokenType.NOT, "not", lineStart, line, colStart, col);
             case "on" -> new Token(TokenType.ON, "on", lineStart, line, colStart, col);
             case "only" -> new Token(TokenType.ONLY, "only", lineStart, line, colStart, col);
@@ -491,6 +368,7 @@ public class Lexer {
             case "uninit" -> new Token(TokenType.UNINIT, "uninit", lineStart, line, colStart, col);
             case "until" -> new Token(TokenType.UNTIL, "until", lineStart, line, colStart, col);
             case "Void" -> new Token(TokenType.VOID, "Void", lineStart, line, colStart, col);
+            case "while" -> new Token(TokenType.WHILE, "while", lineStart, line, colStart, col);
 
             // -----------------------------------------------------------------------------------------------
             //                                      BOOLEAN LITERALS

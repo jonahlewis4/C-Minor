@@ -1,7 +1,7 @@
-package Lexer;
+package AST;
 
 public class Token {
-    // There are currently 118 possible different tokens
+    // There are currently 124 possible different tokens
     public enum TokenType {
         EOF,        // $
         ERROR,      // Error
@@ -134,6 +134,12 @@ public class Token {
         XOR,        // ^
         SLEFT,      // <<
         SRIGHT,     // >>
+        PLUSEQ,      // +=
+        MINUSEQ,      // -=
+        MULTEQ,     // *=
+        DIVEQ,      // /=
+        MODEQ,      // %=
+        EXPEQ,      // **=
 
 
         /*
