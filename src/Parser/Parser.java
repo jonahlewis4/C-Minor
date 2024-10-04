@@ -1,10 +1,15 @@
 package Parser;
 
 import Lexer.Lexer;
-import Lexer.Lexer.TokenType;
-import Lexer.Token;
+import AST.Statements.*;
+import AST.Token;
+import AST.Token.TokenType;
 
 import java.util.ArrayList;
+
+// Use Reflection concepts
+// Function to return AST nodes
+
 
 /*
 do typecasting functions in expression, make sure to throw exception in expression class
@@ -873,6 +878,7 @@ public class Parser {
         else if(nextLA(TokenType.IF)) ifStatement();
         else if(nextLA(TokenType.WHILE)) whileStatement();
         else if(nextLA(TokenType.DO)) doWhileStatement();
+        else if(nextLA(TokenType.FOR)) forStatement();
         else if(nextLA(TokenType.CHOICE)) choiceStatement();
         else if(nextLA(TokenType.CIN)) inputStatement();
         else if(nextLA(TokenType.COUT)) outputStatement();
@@ -933,7 +939,6 @@ public class Parser {
         blockStatement();
     }
 
-
     // 50. while_statement ::= 'while' expression ( 'next' expression )? block_statement
     private void whileStatement() {
         match(TokenType.WHILE);
@@ -946,7 +951,7 @@ public class Parser {
     }
 
 
-    // 51. do_while_statement ::= 'do' block_statement ( 'next' expression )? 'while' expression ;
+    // 51. do_while_statement ::= 'do' block_statement ( 'next' expression )? 'while' expression
     private void doWhileStatement() {
         match(TokenType.DO);
         blockStatement();
@@ -959,7 +964,19 @@ public class Parser {
     }
 
     //TODO: ADD FOR STATEMENT
+    // 52. for_statement ::= 'for' expression ( 'next' expression )? do expression block_statement
+    private void forStatement() {
+        match(TokenType.FOR);
+        expression();
 
+        if(nextLA(TokenType.NEXT)) {
+            match(TokenType.NEXT);
+            expression();
+        }
+        match(TokenType.DO);
+        expression();
+        blockStatement();
+    }
 
     // 52. choice_statement ::= 'choice' expression '{' case_statement* 'other' block_statement '}'
     private void choiceStatement() {

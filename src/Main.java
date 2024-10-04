@@ -15,9 +15,9 @@ public class Main {
         var parser = new Parser(lexer);
         parser.compilation();
 
-        System.out.println("Parsing is complete...");
+        System.out.println("\nParsing is complete...");
     }
-    
+
     // This will read in a C Minor source program into a buffer, and it will return a
     private static String readProgram(String fileName) throws Exception {
         File program = new File("/home/dalev/C_Minor/UnitTests/GoodTests/"+fileName);
@@ -27,6 +27,7 @@ public class Main {
         String currLine = readInput.readLine();
         while(currLine != null) {
             programAsStr.append(currLine);
+            programAsStr.append('\n');
             currLine = readInput.readLine();
         }
 
