@@ -1,35 +1,8 @@
 package Parser;
 
-import Lexer.Lexer;
-import AST.Statements.*;
-import AST.Token;
-import AST.Token.TokenType;
-
+import Lexer.*;
+import Token.*;
 import java.util.ArrayList;
-
-// Use Reflection concepts
-// Function to return AST nodes
-
-
-/*
-do typecasting functions in expression, make sure to throw exception in expression class
-RangeExpr should be added to tree
-
-He's scaring me :') think about the message
-for statements later
-1. Is return type optional or not?
-2. 'property', 'protected', 'public' single defined block?                  yes
-3. 'in out' allowed or only 'inout'                                         do one token
-4. '!=' allowed? I do not want '<>' :)                                      !=
-5. ':<' | '>:' still allowed? Or replace with keywords 'min' | 'max'        later issue
-6. Does main have a return type?
-7. Anonymous blocks allowed?                                                yes
-8. List commands removed?                                                   later issue
-9. Refs are gone?                                                              later issue
-10. What is 'as?' keyword                   checks if var can be typecasted, create new typecasted var
-11. Constructor, use ':' instead of '='?    yes
-12. Instantiate object without fields   2 constructors (default/arguments) hash table approach wit this one
-*/
 
 public class Parser {
     private final Lexer input;
@@ -48,7 +21,7 @@ public class Parser {
 
     private void consume() {
         lookaheads[lookPos] = this.input.nextToken();
-        lookaheads[lookPos].asString();
+        lookaheads[lookPos].toString();
         lookPos = (lookPos + 1) % k;
     }
 
@@ -79,134 +52,89 @@ public class Parser {
         return false;
     }
 
-    private ArrayList<TokenType> expectedEnumToks() {
-        ArrayList<TokenType> expectedToks = new ArrayList<TokenType>();
-        expectedToks.add(TokenType.ID);
-        expectedToks.add(TokenType.LIST);
-        expectedToks.add(TokenType.TUPLE);
-        expectedToks.add(TokenType.STRING);
-        expectedToks.add(TokenType.REAL);
-        expectedToks.add(TokenType.INT);
-        expectedToks.add(TokenType.CHAR);
-        expectedToks.add(TokenType.BOOL);
-        return expectedToks;
+    private boolean isEnumFIRST() {
+        return isScalarTypeFIRST() ||
+               nextLA(TokenType.ID) ||
+               nextLA(TokenType.LIST) ||
+               nextLA(TokenType.TUPLE);
     }
 
-    private ArrayList<TokenType> expectedClassToks() {
-        ArrayList<TokenType> expectedTok = new ArrayList<TokenType>();
-        expectedTok.add(TokenType.PROPERTY);
-        expectedTok.add(TokenType.PROTECTED);
-        expectedTok.add(TokenType.PUBLIC);
-        return expectedTok;
+    private boolean isScalarTypeFIRST() {
+        return nextLA(TokenType.STRING) ||
+                nextLA(TokenType.REAL) ||
+                nextLA(TokenType.BOOL) ||
+                nextLA(TokenType.INT) ||
+                nextLA(TokenType.CHAR);
     }
 
-    private ArrayList<TokenType> expectedBodyToks() {
-        ArrayList<TokenType> expectedToks = new ArrayList<TokenType>();
-        expectedToks.add(TokenType.COUT);
-        expectedToks.add(TokenType.CIN);
-        expectedToks.add(TokenType.CHOICE);
-        expectedToks.add(TokenType.DO);
-        expectedToks.add(TokenType.FOR);
-        expectedToks.add(TokenType.WHILE);
-        expectedToks.add(TokenType.IF);
-        expectedToks.add(TokenType.LBRACE);
-        expectedToks.add(TokenType.SET);
-        expectedToks.add(TokenType.RETURN);
-        expectedToks.add(TokenType.STRING);
-        expectedToks.add(TokenType.REAL);
-        expectedToks.add(TokenType.INT);
-        expectedToks.add(TokenType.CHAR);
-        expectedToks.add(TokenType.BOOL);
-        expectedToks.add(TokenType.TILDE);
-        expectedToks.add(TokenType.NOT);
-        expectedToks.add(TokenType.LPAREN);
-        expectedToks.add(TokenType.ID);
-        expectedToks.add(TokenType.NEW);
-        expectedToks.add(TokenType.LBRACK);
-        expectedToks.add(TokenType.TUPLE);
-        expectedToks.add(TokenType.ARRAY);
-        expectedToks.add(TokenType.LIST);
-        expectedToks.add(TokenType.TEXT_LIT);
-        expectedToks.add(TokenType.STR_LIT);
-        expectedToks.add(TokenType.REAL_LIT);
-        expectedToks.add(TokenType.INT_LIT);
-        expectedToks.add(TokenType.CHAR_LIT);
-        expectedToks.add(TokenType.BOOL_LIT);
-        return expectedToks;
+    private boolean isDataDeclFIRST() {
+        return nextLA(TokenType.PROPERTY) ||
+                nextLA(TokenType.PROTECTED) ||
+                nextLA(TokenType.PUBLIC);
     }
 
-    private ArrayList<TokenType> firstSetExpression() {
-        ArrayList<TokenType> expectedToks = new ArrayList<TokenType>();
-        expectedToks.add(TokenType.CAST);
-        expectedToks.add(TokenType.LENGTH);
-        expectedToks.add(TokenType.SLICE);
-        expectedToks.add(TokenType.ID);
-        expectedToks.add(TokenType.LPAREN);
-        expectedToks.add(TokenType.LBRACK);
-        expectedToks.add(TokenType.ARRAY);
-        expectedToks.add(TokenType.LIST);
-        expectedToks.add(TokenType.TUPLE);
-        expectedToks.add(TokenType.STR_LIT);
-        expectedToks.add(TokenType.TEXT_LIT);
-        expectedToks.add(TokenType.REAL_LIT);
-        expectedToks.add(TokenType.INT_LIT);
-        expectedToks.add(TokenType.CHAR_LIT);
-        expectedToks.add(TokenType.BOOL_LIT);
-
-        return expectedToks;
+    private boolean isStatFIRST() {
+        return isConstant() ||
+               isScalarTypeFIRST() ||
+               nextLA(TokenType.LBRACK) ||
+               nextLA(TokenType.NEW) ||
+               nextLA(TokenType.ID) ||
+               nextLA(TokenType.LPAREN) ||
+               nextLA(TokenType.NOT) ||
+               nextLA(TokenType.TILDE) ||
+               nextLA(TokenType.LBRACK) ||
+               nextLA(TokenType.RETURN) ||
+               nextLA(TokenType.SET) ||
+               nextLA(TokenType.IF) ||
+               nextLA(TokenType.WHILE) ||
+               nextLA(TokenType.FOR) ||
+               nextLA(TokenType.DO) ||
+               nextLA(TokenType.CHOICE) ||
+               nextLA(TokenType.CIN) ||
+               nextLA(TokenType.COUT);
     }
 
-    private ArrayList<TokenType> expectedPostfixToks() {
-        ArrayList<TokenType> expectedToks = new ArrayList<TokenType>();
-        expectedToks.add(TokenType.LBRACK);
-        expectedToks.add(TokenType.LPAREN);
-        expectedToks.add(TokenType.ELVIS);
-        expectedToks.add(TokenType.PERIOD);
-        return expectedToks;
+    private boolean isPrimExprFIRST() {
+        return isConstant() ||
+               nextLA(TokenType.ARRAY) ||
+               nextLA(TokenType.LIST) ||
+               nextLA(TokenType.TUPLE) ||
+               nextLA(TokenType.LBRACK) ||
+               nextLA(TokenType.LPAREN) ||
+               nextLA(TokenType.ID) ||
+               nextLA(TokenType.SLICE) ||
+               nextLA(TokenType.LENGTH) ||
+               nextLA(TokenType.CAST);
     }
 
-    private ArrayList<TokenType> expectedCastToks() {
-        ArrayList<TokenType> expectedToks = new ArrayList<TokenType>();
-        expectedToks.add(TokenType.STRING);
-        expectedToks.add(TokenType.REAL);
-        expectedToks.add(TokenType.INT);
-        expectedToks.add(TokenType.CHAR);
-        expectedToks.add(TokenType.BOOL);
-        return expectedToks;
+    private boolean isAfterPrimExprFIRST() {
+        return nextLA(TokenType.LBRACK) ||
+                nextLA(TokenType.LPAREN) ||
+                nextLA(TokenType.ELVIS) ||
+                nextLA(TokenType.PERIOD);
     }
 
-    private ArrayList<TokenType> expectedMultiplicationToks() {
-        ArrayList<TokenType> expectedToks = new ArrayList<TokenType>();
-        expectedToks.add(TokenType.MULT);
-        expectedToks.add(TokenType.DIV);
-        expectedToks.add(TokenType.MOD);
-        return expectedToks;
+    private boolean isAfterPowerFIRST() {
+        return nextLA(TokenType.MULT) ||
+                nextLA(TokenType.DIV) ||
+                nextLA(TokenType.MOD);
     }
 
-    private ArrayList<TokenType> expectedAdditiveToks() {
-        ArrayList<TokenType> expectedToks = new ArrayList<TokenType>();
-        expectedToks.add(TokenType.PLUS);
-        expectedToks.add(TokenType.MINUS);
-        return expectedToks;
+    private boolean isAfterAddFIRST() {
+        return nextLA(TokenType.LT) ||
+               nextLA(TokenType.GT) ||
+               nextLA(TokenType.LTEQ) ||
+               nextLA(TokenType.GTEQ);
     }
 
-    private ArrayList<TokenType> expectedRelationalToks() {
-        ArrayList<TokenType> tokList = new ArrayList<TokenType>();
-        tokList.add(TokenType.LT);
-        tokList.add(TokenType.GT);
-        tokList.add(TokenType.LTEQ);
-        tokList.add(TokenType.GTEQ);
-        return tokList;
+    private boolean isConstant() {
+        return nextLA(TokenType.STR_LIT) ||
+                nextLA(TokenType.TEXT_LIT) ||
+                nextLA(TokenType.REAL_LIT) ||
+                nextLA(TokenType.BOOL_LIT) ||
+                nextLA(TokenType.INT_LIT) ||
+                nextLA(TokenType.CHAR_LIT);
     }
-
-    private ArrayList<TokenType> expectedShiftToks() {
-        ArrayList<TokenType> expectedTok = new ArrayList<TokenType>();
-
-        expectedTok.add(TokenType.SLEFT);
-        expectedTok.add(TokenType.SRIGHT);
-        return expectedTok;
-    }
-
 
     /*
     ------------------------------------------------------------
@@ -329,8 +257,8 @@ public class Parser {
     private void enumType() {
         match(TokenType.DEF);
         match(TokenType.ID);
-        ArrayList<TokenType> ID_LIST_TUPLE_STRING_REAL_INT_CHAR_BOOL = expectedEnumToks();
-        if(anyLA(ID_LIST_TUPLE_STRING_REAL_INT_CHAR_BOOL)) type();
+
+        if(isEnumFIRST()) type();
 
         match(TokenType.TYPE);
         match(TokenType.EQ);
@@ -565,8 +493,7 @@ public class Parser {
     private void classBody() {
         match(TokenType.LBRACE);
 
-        ArrayList<TokenType> PROPERTY_PROTECTED_PUBLIC = expectedClassToks();
-        while(anyLA(PROPERTY_PROTECTED_PUBLIC) && nextLA(TokenType.ID,1))
+        while(isDataDeclFIRST() && nextLA(TokenType.ID,1))
             dataDecl();
         while(nextLA(TokenType.PROTECTED) || nextLA(TokenType.PUBLIC))
             methodDecl();
@@ -839,8 +766,7 @@ public class Parser {
         match(TokenType.LBRACE);
         while(nextLA(TokenType.DEF)) declaration();
 
-        ArrayList<TokenType> statementToks = expectedBodyToks();
-        while(anyLA(statementToks)) statement();
+        while(isStatFIRST()) statement();
 
         match(TokenType.RBRACE);
     }
@@ -889,8 +815,7 @@ public class Parser {
     // 45. return_statement ::= expression?
     private void returnStatement() {
         match(TokenType.RETURN);
-        ArrayList<TokenType> exprFirstSet = firstSetExpression();
-        if(anyLA(exprFirstSet)) expression();
+        if(isPrimExprFIRST()) expression();
     }
 
 
@@ -1056,9 +981,8 @@ public class Parser {
     // 57. postfix_expression ::= primary_expression ( '[' expression ']' | '(' arguments ')' | ( '.' | '?.' ) expression)*
     private void postfixExpression() {
         primaryExpression();
-        ArrayList<TokenType> LBRACK_LPAREN_ELVIS_PERIOD = expectedPostfixToks();
 
-        while(anyLA(LBRACK_LPAREN_ELVIS_PERIOD)) {
+        while(isAfterPrimExprFIRST()) {
             if(nextLA(TokenType.LBRACK)) {
                 match(TokenType.LBRACK);
                 expression();
@@ -1099,8 +1023,7 @@ public class Parser {
 
     // 60. cast_expression ::= scalar_type '(' cast_expression ')' | unary_expression
     private void castExpression() {
-        ArrayList<TokenType> STRING_REAL_INT_CHAR_BOOL = expectedCastToks();
-        if(anyLA(STRING_REAL_INT_CHAR_BOOL)) {
+        if(isScalarTypeFIRST()) {
             scalarType();
             match(TokenType.LPAREN);
             castExpression();
@@ -1123,9 +1046,8 @@ public class Parser {
     // 62. multiplication_expression ::= power_expression ( ( '*' | '/' | '%' ) power_expression )*
     private void multiplicationExpression() {
         powerExpression();
-        ArrayList<TokenType> MULT_DIV_MOD = expectedMultiplicationToks();
 
-        while(anyLA(MULT_DIV_MOD)) {
+        while(isAfterPowerFIRST()) {
             if(nextLA(TokenType.MULT)) match(TokenType.MULT);
             else if(nextLA(TokenType.DIV)) match(TokenType.DIV);
             else match(TokenType.MOD);
@@ -1138,9 +1060,8 @@ public class Parser {
     // 63. additive_expression ::= multiplication_expression ( ( '+' | '-' ) multiplication_expression )*
     private void additiveExpression() {
         multiplicationExpression();
-        ArrayList<TokenType> PLUS_MINUS = expectedAdditiveToks();
 
-        while(anyLA(PLUS_MINUS)) {
+        while(nextLA(TokenType.PLUS) || nextLA(TokenType.MINUS)) {
             if(nextLA(TokenType.PLUS)) match(TokenType.PLUS);
             else match(TokenType.MINUS);
 
@@ -1165,9 +1086,8 @@ public class Parser {
     // 65. relational_expression ::= shift_expression ( ( '<' | '>' | '<=' | '>=' ) shift_expression )*
     private void relationalExpression() {
         additiveExpression();
-        ArrayList<TokenType> LT_GT_LTEQ_GTEQ = expectedRelationalToks();
 
-        while(anyLA(LT_GT_LTEQ_GTEQ)) {
+        while(isAfterAddFIRST()) {
             if(nextLA(TokenType.LT)) match(TokenType.LT);
             else if(nextLA(TokenType.GT)) match(TokenType.GT);
             else if(nextLA(TokenType.LTEQ)) match(TokenType.LTEQ);
