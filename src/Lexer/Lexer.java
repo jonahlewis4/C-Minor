@@ -1,23 +1,20 @@
 package Lexer;
-import AST.Token;
-import AST.Token.TokenType;
 
+import Token.*;
+
+//TODO: Clean up :)
 /*
----------------------------------------------------
-                        ISSUES
----------------------------------------------------
-                        N/A
- */
-
+                    -------------------
+                       C Minor Lexer
+                    -------------------
+________________________________________________________
+*/
 public class Lexer {
 
     private final String file;  // Program
     private int currPos;        // Position in file
     private char lookChar;      // Current lookahead
-    private int line;           // Line Number
-    private int col;            // Column Number
-    private int lineStart;      // Starting Line
-    private int colStart;       // Starting Column
+    private Location currLoc;   // Current location
 
     public static final char EOF = '\0';
 
@@ -25,14 +22,12 @@ public class Lexer {
         this.file = file;
         this.currPos = 0;
         this.lookChar = file.charAt(currPos);
-        this.line = 1;
-        this.col = 0;
-        this.lineStart = this.colStart = 0;
+        this.currLoc = new Location();
     }
 
     private void consume() {
         currPos += 1;
-        col += 1;
+        currLoc.addCol();
         if(currPos < file.length())
             lookChar = file.charAt(currPos);
         else
@@ -47,64 +42,59 @@ public class Lexer {
     }
 
     private void consumeWhitespace() {
-        while(lookChar == ' ' || lookChar == '\t' || lookChar == '\r')
-            consume();
+        while(lookChar == ' ' || lookChar == '\t' || lookChar == '\r' || lookChar == '\n') {
+            if(lookChar == ' ' || lookChar == '\t')
+                consume();
+            else {
+                consume();
+                currLoc.addLine();
+            }
+        }
+        currLoc.resetStart();
     }
 
     private void consumeComment() {
         while(lookChar != '\n')
             consume();
-        nextLine();
-    }
-
-    private void nextLine() {
-        consume();
-        line += 1;
-        col = 0;
+        consumeWhitespace();
     }
 
     public Token nextToken() {
         while(lookChar != EOF) {
-            // Store the starting line/column before figuring out token
-            lineStart = line;
-            colStart = col;
             switch(lookChar) {
-                case ' ', '\t', '\r':
+                case ' ', '\t', '\r', '\n':
                     consumeWhitespace();
-                    break;
-                case '\n':
-                    nextLine();
                     break;
                 case '=':
                     consume();
                     if(match('='))
-                        return new Token(TokenType.EQEQ, "==", lineStart, line, colStart, col);
+                        return new Token(TokenType.EQEQ, "==", currLoc.copy());
                     if(match('>'))
-                        return new Token(TokenType.ARROW, "=>", lineStart, line, colStart, col);
-                    return new Token(TokenType.EQ, "=", lineStart, line, colStart, col);
+                        return new Token(TokenType.ARROW, "=>", currLoc.copy());
+                    return new Token(TokenType.EQ, "=", currLoc.copy());
                 case '+':
                     consume();
                     if(match('='))
-                        return new Token(TokenType.PLUSEQ, "+=", lineStart, line, colStart, col);
-                    return new Token(TokenType.PLUS, "+", lineStart, line, colStart, col);
+                        return new Token(TokenType.PLUSEQ, "+=", currLoc.copy());
+                    return new Token(TokenType.PLUS, "+", currLoc.copy());
                 case '-':
                     consume();
                     if(match('='))
-                        return new Token(TokenType.MINUSEQ, "-=", lineStart, line, colStart, col);
-                    return new Token(TokenType.MINUS, "-", lineStart, line, colStart, col);
+                        return new Token(TokenType.MINUSEQ, "-=", currLoc.copy());
+                    return new Token(TokenType.MINUS, "-", currLoc.copy());
                 case '*':
                     consume();
                     if(match('*')) {
                         if(match('='))
-                            return new Token(TokenType.EXPEQ, "**=", lineStart, line, colStart, col);
+                            return new Token(TokenType.EXPEQ, "**=", currLoc.copy());
 
-                        return new Token(TokenType.EXP, "**", lineStart, line, colStart, col);
+                        return new Token(TokenType.EXP, "**", currLoc.copy());
                     }
 
                     if(match('='))
-                        return new Token(TokenType.MULTEQ, "*=", lineStart, line, colStart, col);
+                        return new Token(TokenType.MULTEQ, "*=", currLoc.copy());
 
-                    return new Token(TokenType.MULT, "*", lineStart, line, colStart, col);
+                    return new Token(TokenType.MULT, "*", currLoc.copy());
                 case '/':
                     consume();
                     if(match('/')) {
@@ -112,131 +102,130 @@ public class Lexer {
                         break;
                     }
                     if(match('='))
-                        return new Token(TokenType.DIVEQ, "/=", lineStart, line, colStart, col);
+                        return new Token(TokenType.DIVEQ, "/=", currLoc.copy());
 
-                    return new Token(TokenType.DIV, "/", lineStart, line, colStart, col);
+                    return new Token(TokenType.DIV, "/", currLoc.copy());
                 case '~':
                     consume();
-                    return new Token(TokenType.TILDE, "~", lineStart, line, colStart, col);
+                    return new Token(TokenType.TILDE, "~", currLoc.copy());
                 case '%':
                     consume();
                     if(match('='))
-                        return new Token(TokenType.MODEQ, "%=", lineStart, line, colStart, col);
+                        return new Token(TokenType.MODEQ, "%=", currLoc.copy());
 
-                    return new Token(TokenType.MOD, "%", lineStart, line, colStart, col);
+                    return new Token(TokenType.MOD, "%", currLoc.copy());
                 case '!':
                     consume();
                     if(match('='))
-                        return new Token(TokenType.NEQ, "!=", lineStart, line, colStart, col);
+                        return new Token(TokenType.NEQ, "!=", currLoc.copy());
                     // Error
-                    return new Token(TokenType.ERROR, "ERROR", lineStart, line, colStart, col);
+                    return new Token(TokenType.ERROR, "ERROR", currLoc.copy());
                 case '<':
                     consume();
                     if(match('=')) {
                         if(match('>'))
-                            return new Token(TokenType.UFO, "<=>", lineStart, line, colStart, col);
+                            return new Token(TokenType.UFO, "<=>", currLoc.copy());
 
-                        return new Token(TokenType.LTEQ, "<=", lineStart, line, colStart, col);
+                        return new Token(TokenType.LTEQ, "<=", currLoc.copy());
                     }
 
                     if(match('>'))
-                        return new Token(TokenType.LTGT, "<>", lineStart, line, colStart, col);
+                        return new Token(TokenType.LTGT, "<>", currLoc.copy());
 
                     if(match(':'))
-                        return new Token(TokenType.MIN, "<:", lineStart, line, colStart, col);
+                        return new Token(TokenType.MIN, "<:", currLoc.copy());
 
                     if(match('<'))
-                        return new Token(TokenType.SLEFT, "<<", lineStart, line, colStart, col);
+                        return new Token(TokenType.SLEFT, "<<", currLoc.copy());
 
-                    return new Token(TokenType.LT, "<", lineStart, line, colStart, col);
+                    return new Token(TokenType.LT, "<", currLoc.copy());
                 case '>':
                     consume();
                     if(match('='))
-                        return new Token(TokenType.GTEQ, ">=", lineStart, line, colStart, col);
+                        return new Token(TokenType.GTEQ, ">=", currLoc.copy());
 
                     if(match('>'))
-                        return new Token(TokenType.SRIGHT, ">>", lineStart, line, colStart, col);
+                        return new Token(TokenType.SRIGHT, ">>", currLoc.copy());
 
-                    return new Token(TokenType.GT, ">", lineStart, line, colStart, col);
+                    return new Token(TokenType.GT, ">", currLoc.copy());
                 case ':':
                     consume();
                     if(match('>'))
-                        return new Token(TokenType.MAX, ":>", lineStart, line, colStart, col);
+                        return new Token(TokenType.MAX, ":>", currLoc.copy());
 
-                    return new Token(TokenType.COLON, ":", lineStart, line, colStart, col);
+                    return new Token(TokenType.COLON, ":", currLoc.copy());
                 case '.':
                     consume();
                     if(isDigit())
-                        return realLit(new StringBuilder("."), lineStart, colStart);
+                        return realLit(new StringBuilder("."));
                     if(match('.'))
-                        return new Token(TokenType.INC, "..", lineStart, line, colStart, col);
+                        return new Token(TokenType.INC, "..", currLoc.copy());
 
-                    return new Token(TokenType.PERIOD, ".", lineStart, line, colStart, col);
+                    return new Token(TokenType.PERIOD, ".", currLoc.copy());
                 case ',':
                     consume();
-                    return new Token(TokenType.COMMA, ",", lineStart, line, colStart, col);
+                    return new Token(TokenType.COMMA, ",", currLoc.copy());
                 case '(':
                     consume();
-                    return new Token(TokenType.LPAREN, "(", lineStart, line, colStart, col);
+                    return new Token(TokenType.LPAREN, "(", currLoc.copy());
                 case ')':
                     consume();
-                    return new Token(TokenType.RPAREN, ")", lineStart, line, colStart, col);
+                    return new Token(TokenType.RPAREN, ")", currLoc.copy());
                 case '{':
                     consume();
-                    return new Token(TokenType.LBRACE, "{", lineStart, line, colStart, col);
+                    return new Token(TokenType.LBRACE, "{", currLoc.copy());
                 case '}':
                     consume();
-                    return new Token(TokenType.RBRACE, "}", lineStart, line, colStart, col);
+                    return new Token(TokenType.RBRACE, "}", currLoc.copy());
                 case '[':
                     consume();
-                    return new Token(TokenType.LBRACK, "[", lineStart, line, colStart, col);
+                    return new Token(TokenType.LBRACK, "[", currLoc.copy());
                 case ']':
                     consume();
-                    return new Token(TokenType.RBRACK, "]", lineStart, line, colStart, col);
+                    return new Token(TokenType.RBRACK, "]", currLoc.copy());
                 case '@':
                     consume();
-                    return new Token(TokenType.AT, "@", lineStart, line, colStart, col);
+                    return new Token(TokenType.AT, "@", currLoc.copy());
                 case '\'':
                     consume();
                     if(match('\'') && match('\''))
-                        return strLit(new StringBuilder(), lineStart, colStart);
-                    return charLit(lineStart, colStart);
+                        return strLit(new StringBuilder());
+                    return charLit();
                 case '?':
                     consume();
                     if(match('.'))
-                        return new Token(TokenType.ELVIS, "?.", lineStart, line, colStart, col);
-                    else return new Token(TokenType.ERROR, "ERROR", lineStart, line, colStart, col);
+                        return new Token(TokenType.ELVIS, "?.", currLoc.copy());
+                    else return new Token(TokenType.ERROR, "ERROR", currLoc.copy());
                 case '|':
                     consume();
-                    return new Token(TokenType.BOR, "|", lineStart, line, colStart, col);
+                    return new Token(TokenType.BOR, "|", currLoc.copy());
                 case '&':
                     consume();
-                    return new Token(TokenType.BAND, "&", lineStart, line, colStart, col);
+                    return new Token(TokenType.BAND, "&", currLoc.copy());
                 case '^':
                     consume();
-                    return new Token(TokenType.XOR, "^", lineStart, line, colStart, col);
+                    return new Token(TokenType.XOR, "^", currLoc.copy());
                 default:
                     if(isLetter() || match('#'))
-                        return name(lineStart, colStart);
+                        return name();
                     if(isDigit())
-                        return number(lineStart, colStart);
+                        return number();
 
-                    return new Token(TokenType.ERROR, "ERROR", lineStart, line, colStart, col);
+                    return new Token(TokenType.ERROR, "ERROR", currLoc.copy());
             }
         }
-        return new Token(TokenType.EOF, "EOF", line, line, col, col);
+        return new Token(TokenType.EOF, "EOF", currLoc.copy());
     }
 
-    private boolean isLetter() {
-        return ((lookChar >= 'A' && lookChar <= 'Z')
-                || (lookChar >= 'a' && lookChar <= 'z'));
+    private boolean isLetter() { return ((lookChar >= 'A' && lookChar <= 'Z')
+                                     || (lookChar >= 'a' && lookChar <= 'z'));
     }
 
     private boolean isDigit() { return (lookChar >= '0' && lookChar <= '9'); }
 
     private boolean isEOF() { return currPos == file.length(); }
 
-    private Token charLit(int lineStart, int colStart) {
+    private Token charLit() {
         StringBuilder newChar = new StringBuilder();
 
         if(match('\\'))
@@ -249,39 +238,39 @@ public class Lexer {
         }
 
         if(!match('\''))
-            return strLit(newChar, lineStart, colStart);
+            return strLit(newChar);
 
-        return new Token(TokenType.CHAR_LIT, newChar.toString(), lineStart, line, colStart, col);
+        return new Token(TokenType.CHAR_LIT, newChar.toString(), currLoc.copy());
     }
 
-    private Token strLit(StringBuilder newStr, int lineStart, int colStart) {
+    private Token strLit(StringBuilder newStr) {
         while(!match('\'') && !isEOF()) {
             newStr.append(lookChar);
             consume();
         }
         if(match('\'') && match('\''))
-            return new Token(TokenType.TEXT_LIT, newStr.toString(), lineStart, line, colStart, col);
+            return new Token(TokenType.TEXT_LIT, newStr.toString(), currLoc.copy());
 
-        return new Token(TokenType.STR_LIT, newStr.toString(), lineStart, line, colStart, col);
+        return new Token(TokenType.STR_LIT, newStr.toString(), currLoc.copy());
     }
 
-    private Token realLit(StringBuilder newReal, int lineStart, int colStart) {
+    private Token realLit(StringBuilder newReal) {
         while(isDigit()) {
             newReal.append(lookChar);
             consume();
         }
-        return new Token(TokenType.REAL_LIT, newReal.toString(), lineStart, line, colStart, col);
+        return new Token(TokenType.REAL_LIT, newReal.toString(), currLoc.copy());
     }
 
-    private Token createID(StringBuilder newID, int lineStart, int colStart) {
+    private Token createID(StringBuilder newID) {
         while(isDigit() || isLetter()) {
             newID.append(lookChar);
             consume();
         }
-        return new Token(TokenType.ID, newID.toString(), lineStart, line, colStart, col);
+        return new Token(TokenType.ID, newID.toString(), currLoc.copy());
     }
 
-    private Token name(int lineStart, int colStart) {
+    private Token name() {
         StringBuilder createStr = new StringBuilder();
 
         while(isLetter() || match('#')) {
@@ -290,7 +279,7 @@ public class Lexer {
         }
 
         if(isDigit())
-            return createID(createStr, lineStart, colStart);
+            return createID(createStr);
 
         String nextStr = createStr.toString();
         return switch(nextStr) {
@@ -298,90 +287,90 @@ public class Lexer {
             //                                            KEYWORDS
             // -----------------------------------------------------------------------------------------------
 
-            case "#include" -> new Token(TokenType.INCLUDE, "#include", lineStart, line, colStart, col);
-            case "#exclude" -> new Token(TokenType.EXCLUDE, "#exclude", lineStart, line, colStart, col);
-            case "abstr" -> new Token(TokenType.ABSTR, "abstr", lineStart, line, colStart, col);
-            case "and" -> new Token(TokenType.AND, "and", lineStart, line, colStart, col);
-            case "append" -> new Token(TokenType.APPEND, "append", lineStart, line, colStart, col);
-            case "Array" -> new Token(TokenType.ARRAY, "Array", lineStart, line, colStart, col);
-            case "Bool" -> new Token(TokenType.BOOL, "Bool", lineStart, line, colStart, col);
-            case "cast" -> new Token(TokenType.CAST, "cast", lineStart, line, colStart, col);
-            case "Char" -> new Token(TokenType.CHAR, "Char", lineStart, line, colStart, col);
-            case "choice" -> new Token(TokenType.CHOICE, "choice", lineStart, line, colStart, col);
-            case "cin" -> new Token(TokenType.CIN, "cin", lineStart, line, colStart, col);
-            case "class" -> new Token(TokenType.CLASS, "class", lineStart, line, colStart, col);
-            case "const" -> new Token(TokenType.CONST, "const", lineStart, line, colStart, col);
-            case "cout" -> new Token(TokenType.COUT, "cout", lineStart, line, colStart, col);
-            case "def" -> new Token(TokenType.DEF, "def", lineStart, line, colStart, col);
-            case "discr" -> new Token(TokenType.DISCR, "discr", lineStart, line, colStart, col);
-            case "do" -> new Token(TokenType.DO, "do", lineStart, line, colStart, col);
-            case "else" -> new Token(TokenType.ELSE, "else", lineStart, line, colStart, col);
-            case "endl" -> new Token(TokenType.ENDL, "endl", lineStart, line, colStart, col);
-            case "except" -> new Token(TokenType.EXCEPT, "except", lineStart, line, colStart, col);
-            case "final" -> new Token(TokenType.FINAL, "final", lineStart, line, colStart, col);
-            case "for" -> new Token(TokenType.FOR, "for", lineStart, line, colStart, col);
-            case "global" -> new Token(TokenType.GLOBAL, "global", lineStart, line, colStart, col);
-            case "if" -> new Token(TokenType.IF, "if", lineStart, line, colStart, col);
-            case "in" -> new Token(TokenType.IN, "in", lineStart, line, colStart, col);
-            case "Int" -> new Token(TokenType.INT, "Int", lineStart, line, colStart, col);
-            case "inherits" -> new Token(TokenType.INHERITS, "inherits", lineStart, line, colStart, col);
-            case "inout" -> new Token(TokenType.INOUT, "inout", lineStart, line, colStart, col);
-            case "inrev" -> new Token(TokenType.INREV, "inrev", lineStart, line, colStart, col);
-            case "insert" -> new Token(TokenType.INSERT, "insert", lineStart, line, colStart, col);
-            case "instanceof" -> new Token(TokenType.INSTANCEOF, "instanceof", lineStart, line, colStart, col);
-            case "length" -> new Token(TokenType.LENGTH, "length", lineStart, line, colStart, col);
-            case "List" -> new Token(TokenType.LIST, "List", lineStart, line, colStart, col);
-            case "local" -> new Token(TokenType.LOCAL, "local", lineStart, line, colStart, col);
-            case "loop" -> new Token(TokenType.LOOP, "loop", lineStart, line, colStart, col);
-            case "main" -> new Token(TokenType.MAIN, "main", lineStart, line, colStart, col);
-            case "method" -> new Token(TokenType.METHOD, "method", lineStart, line, colStart, col);
-            case "new" -> new Token(TokenType.NEW, "new", lineStart, line, colStart, col);
-            case "next" -> new Token(TokenType.NEXT, "next", lineStart, line, colStart, col);
-            case "not" -> new Token(TokenType.NOT, "not", lineStart, line, colStart, col);
-            case "on" -> new Token(TokenType.ON, "on", lineStart, line, colStart, col);
-            case "only" -> new Token(TokenType.ONLY, "only", lineStart, line, colStart, col);
-            case "operator" -> new Token(TokenType.OPERATOR, "operator", lineStart, line, colStart, col);
-            case "or" -> new Token(TokenType.OR, "or", lineStart, line, colStart, col);
-            case "other" -> new Token(TokenType.OTHER, "other", lineStart, line, colStart, col);
-            case "out" -> new Token(TokenType.OUT, "out", lineStart, line, colStart, col);
-            case "overload" -> new Token(TokenType.OVERLOAD, "overload", lineStart, line, colStart, col);
-            case "override" -> new Token(TokenType.OVERRIDE, "override", lineStart, line, colStart, col);
-            case "parent" -> new Token(TokenType.PARENT, "parent", lineStart, line, colStart, col);
-            case "property" -> new Token(TokenType.PROPERTY, "property", lineStart, line, colStart, col);
-            case "protected" -> new Token(TokenType.PROTECTED, "protected", lineStart, line, colStart, col);
-            case "public" -> new Token(TokenType.PUBLIC, "public", lineStart, line, colStart, col);
-            case "pure" -> new Token(TokenType.PURE, "pure", lineStart, line, colStart, col);
-            case "Real" -> new Token(TokenType.REAL, "Real", lineStart, line, colStart, col);
-            case "recurs" -> new Token(TokenType.RECURS, "recurs", lineStart, line, colStart, col);
-            case "ref" -> new Token(TokenType.REF, "ref", lineStart, line, colStart, col);
-            case "remove" -> new Token(TokenType.REMOVE, "remove", lineStart, line, colStart, col);
-            case "rename" -> new Token(TokenType.RENAME, "rename", lineStart, line, colStart, col);
-            case "return" -> new Token(TokenType.RETURN, "return", lineStart, line, colStart, col);
-            case "scalar" -> new Token(TokenType.SCALAR, "scalar", lineStart, line, colStart, col);
-            case "set" -> new Token(TokenType.SET, "set", lineStart, line, colStart, col);
-            case "slice" -> new Token(TokenType.SLICE, "slice", lineStart, line, colStart, col);
-            case "stop" -> new Token(TokenType.STOP, "stop", lineStart, line, colStart, col);
-            case "String" -> new Token(TokenType.STRING, "String", lineStart, line, colStart, col);
-            case "then" -> new Token(TokenType.THEN, "then", lineStart, line, colStart, col);
-            case "Tuple" -> new Token(TokenType.TUPLE, "Tuple", lineStart, line, colStart, col);
-            case "type" -> new Token(TokenType.TYPE, "type", lineStart, line, colStart, col);
-            case "uninit" -> new Token(TokenType.UNINIT, "uninit", lineStart, line, colStart, col);
-            case "until" -> new Token(TokenType.UNTIL, "until", lineStart, line, colStart, col);
-            case "Void" -> new Token(TokenType.VOID, "Void", lineStart, line, colStart, col);
-            case "while" -> new Token(TokenType.WHILE, "while", lineStart, line, colStart, col);
+            case "#include" -> new Token(TokenType.INCLUDE, "#include", currLoc.copy());
+            case "#exclude" -> new Token(TokenType.EXCLUDE, "#exclude", currLoc.copy());
+            case "abstr" -> new Token(TokenType.ABSTR, "abstr", currLoc.copy());
+            case "and" -> new Token(TokenType.AND, "and", currLoc.copy());
+            case "append" -> new Token(TokenType.APPEND, "append", currLoc.copy());
+            case "Array" -> new Token(TokenType.ARRAY, "Array", currLoc.copy());
+            case "Bool" -> new Token(TokenType.BOOL, "Bool", currLoc.copy());
+            case "cast" -> new Token(TokenType.CAST, "cast", currLoc.copy());
+            case "Char" -> new Token(TokenType.CHAR, "Char", currLoc.copy());
+            case "choice" -> new Token(TokenType.CHOICE, "choice", currLoc.copy());
+            case "cin" -> new Token(TokenType.CIN, "cin", currLoc.copy());
+            case "class" -> new Token(TokenType.CLASS, "class", currLoc.copy());
+            case "const" -> new Token(TokenType.CONST, "const", currLoc.copy());
+            case "cout" -> new Token(TokenType.COUT, "cout", currLoc.copy());
+            case "def" -> new Token(TokenType.DEF, "def", currLoc.copy());
+            case "discr" -> new Token(TokenType.DISCR, "discr", currLoc.copy());
+            case "do" -> new Token(TokenType.DO, "do", currLoc.copy());
+            case "else" -> new Token(TokenType.ELSE, "else", currLoc.copy());
+            case "endl" -> new Token(TokenType.ENDL, "endl", currLoc.copy());
+            case "except" -> new Token(TokenType.EXCEPT, "except", currLoc.copy());
+            case "final" -> new Token(TokenType.FINAL, "final", currLoc.copy());
+            case "for" -> new Token(TokenType.FOR, "for", currLoc.copy());
+            case "global" -> new Token(TokenType.GLOBAL, "global", currLoc.copy());
+            case "if" -> new Token(TokenType.IF, "if", currLoc.copy());
+            case "in" -> new Token(TokenType.IN, "in", currLoc.copy());
+            case "Int" -> new Token(TokenType.INT, "Int", currLoc.copy());
+            case "inherits" -> new Token(TokenType.INHERITS, "inherits", currLoc.copy());
+            case "inout" -> new Token(TokenType.INOUT, "inout", currLoc.copy());
+            case "inrev" -> new Token(TokenType.INREV, "inrev", currLoc.copy());
+            case "insert" -> new Token(TokenType.INSERT, "insert", currLoc.copy());
+            case "instanceof" -> new Token(TokenType.INSTANCEOF, "instanceof", currLoc.copy());
+            case "length" -> new Token(TokenType.LENGTH, "length", currLoc.copy());
+            case "List" -> new Token(TokenType.LIST, "List", currLoc.copy());
+            case "local" -> new Token(TokenType.LOCAL, "local", currLoc.copy());
+            case "loop" -> new Token(TokenType.LOOP, "loop", currLoc.copy());
+            case "main" -> new Token(TokenType.MAIN, "main", currLoc.copy());
+            case "method" -> new Token(TokenType.METHOD, "method", currLoc.copy());
+            case "new" -> new Token(TokenType.NEW, "new", currLoc.copy());
+            case "next" -> new Token(TokenType.NEXT, "next", currLoc.copy());
+            case "not" -> new Token(TokenType.NOT, "not", currLoc.copy());
+            case "on" -> new Token(TokenType.ON, "on", currLoc.copy());
+            case "only" -> new Token(TokenType.ONLY, "only", currLoc.copy());
+            case "operator" -> new Token(TokenType.OPERATOR, "operator", currLoc.copy());
+            case "or" -> new Token(TokenType.OR, "or", currLoc.copy());
+            case "other" -> new Token(TokenType.OTHER, "other", currLoc.copy());
+            case "out" -> new Token(TokenType.OUT, "out", currLoc.copy());
+            case "overload" -> new Token(TokenType.OVERLOAD, "overload", currLoc.copy());
+            case "override" -> new Token(TokenType.OVERRIDE, "override", currLoc.copy());
+            case "parent" -> new Token(TokenType.PARENT, "parent", currLoc.copy());
+            case "property" -> new Token(TokenType.PROPERTY, "property", currLoc.copy());
+            case "protected" -> new Token(TokenType.PROTECTED, "protected", currLoc.copy());
+            case "public" -> new Token(TokenType.PUBLIC, "public", currLoc.copy());
+            case "pure" -> new Token(TokenType.PURE, "pure", currLoc.copy());
+            case "Real" -> new Token(TokenType.REAL, "Real", currLoc.copy());
+            case "recurs" -> new Token(TokenType.RECURS, "recurs", currLoc.copy());
+            case "ref" -> new Token(TokenType.REF, "ref", currLoc.copy());
+            case "remove" -> new Token(TokenType.REMOVE, "remove", currLoc.copy());
+            case "rename" -> new Token(TokenType.RENAME, "rename", currLoc.copy());
+            case "return" -> new Token(TokenType.RETURN, "return", currLoc.copy());
+            case "scalar" -> new Token(TokenType.SCALAR, "scalar", currLoc.copy());
+            case "set" -> new Token(TokenType.SET, "set", currLoc.copy());
+            case "slice" -> new Token(TokenType.SLICE, "slice", currLoc.copy());
+            case "stop" -> new Token(TokenType.STOP, "stop", currLoc.copy());
+            case "String" -> new Token(TokenType.STRING, "String", currLoc.copy());
+            case "then" -> new Token(TokenType.THEN, "then", currLoc.copy());
+            case "Tuple" -> new Token(TokenType.TUPLE, "Tuple", currLoc.copy());
+            case "type" -> new Token(TokenType.TYPE, "type", currLoc.copy());
+            case "uninit" -> new Token(TokenType.UNINIT, "uninit", currLoc.copy());
+            case "until" -> new Token(TokenType.UNTIL, "until", currLoc.copy());
+            case "Void" -> new Token(TokenType.VOID, "Void", currLoc.copy());
+            case "while" -> new Token(TokenType.WHILE, "while", currLoc.copy());
 
             // -----------------------------------------------------------------------------------------------
             //                                      BOOLEAN LITERALS
             // -----------------------------------------------------------------------------------------------
 
-            case "true" -> new Token(TokenType.BOOL_LIT, "true", lineStart, line, colStart, col);
-            case "false" -> new Token(TokenType.BOOL_LIT, "false", lineStart, line, colStart, col);
+            case "true" -> new Token(TokenType.BOOL_LIT, "true", currLoc.copy());
+            case "false" -> new Token(TokenType.BOOL_LIT, "false", currLoc.copy());
 
-            default -> createID(createStr, lineStart, colStart);
+            default -> createID(createStr);
         };
     }
 
-    private Token number(int lineStart, int colStart) {
+    private Token number() {
         StringBuilder newNum = new StringBuilder();
         while(isDigit()) {
             newNum.append(lookChar);
@@ -391,10 +380,10 @@ public class Lexer {
         if(match('.')) {
             newNum.append('.');
             if(isDigit())
-                return realLit(newNum, lineStart, colStart);
-            return new Token(TokenType.ERROR, "ERROR", lineStart, line, colStart, col);
+                return realLit(newNum);
+            return new Token(TokenType.ERROR, "ERROR", currLoc.copy());
         }
 
-        return new Token(TokenType.INT_LIT, newNum.toString(), lineStart, line, colStart, col);
+        return new Token(TokenType.INT_LIT, newNum.toString(), currLoc.copy());
     }
 }
