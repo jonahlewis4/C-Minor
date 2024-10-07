@@ -14,11 +14,11 @@ public class CaseStmt extends Statement {
 
         addChild(this.myLabel);
         addChild(this.myBlock);
-        setParent();
     }
 
     public ChoiceLabel getChoiceLabel() { return myLabel; }
     public BlockStmt getBlockStmt() { return myBlock; }
+
     @Override
     public AST whosThatNode(PokeVisitor v) { return v.itsCaseStmt(this); }
 }

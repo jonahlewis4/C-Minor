@@ -5,12 +5,18 @@ import Utilities.PokeVisitor;
 
 public class BinExpr extends Expression {
 
-    public BinExpr(Token t, Expression LHS, Expression RHS, BinOp op) {
-        super(t);
-        addChild(LHS);
-        addChild(RHS);
-        addChild(op);
-        childCount = 3;
+    Expression LHS;
+    Expression RHS;
+    BinOp op;
+
+    public BinExpr(Expression LHS, Expression RHS, BinOp op) {
+        this.LHS = LHS;
+        this.RHS = RHS;
+        this.op = op;
+
+        addChild(this.LHS);
+        addChild(this.RHS);
+        addChild(this.op);
     }
 
     public Expression getLHS() { return (Expression) children.get(0); }

@@ -1,8 +1,10 @@
 package AST.Expressions;
 
 import AST.*;
+import Token.*;
 import Utilities.PokeVisitor;
 
+// Leaf node
 public class BinOp extends AST {
 
     public enum BinOpType {

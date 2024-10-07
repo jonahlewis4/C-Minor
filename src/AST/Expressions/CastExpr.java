@@ -1,20 +1,25 @@
 package AST.Expressions;
 
 import AST.*;
+import AST.Types.*;
 import Utilities.PokeVisitor;
 
 // Something to do with constant values
 public class CastExpr extends Expression {
 
-    public CastExpr(Token t, Type castType, Expression castExpr) {
-        super(t);
-        addChild(castType);
-        addChild(castExpr);
-        childCount = 2;
+    Type myType;
+    Expression expr;
+
+    public CastExpr(Type myType, Expression castExpr) {
+        expr = castExpr;
+        this.myType = myType;
+
+        addChild(myType);
+        addChild(expr);
     }
 
-    public Type getCastType() { return (Type) children.get(0); }
-    public Expression getCastExpr() { return (Expression) children.get(1); }
+    public Type getCastType() { return myType; }
+    public Expression getCastExpr() { return expr; }
 
     @Override
     public AST whosThatNode(PokeVisitor v) { return v.itsCastExpr(this); }

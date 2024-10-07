@@ -1,29 +1,28 @@
 package AST.Statements;
 
-import AST.AST;
-import AST.Expressions.Expression;
-import AST.Token;
-import AST.Type;
+import AST.*;
+import AST.Expressions.*;
+import AST.Types.*;
+import Token.*;
 import Utilities.PokeVisitor;
 
-/*
-----------------------------------------------------------------------
-                                RETURNSTMT
-----------------------------------------------------------------------
-Fields:
-    1. returnExpr: Expression representing what we are returning
-*/
+
 public class ReturnStmt extends Statement {
 
-    Expression returnExpr;
+    private Type type;
 
-    public ReturnStmt(Expression returnExpr) {
-        this.returnExpr = returnExpr;
-        children.add(this.returnExpr);
+    Expression expr;
+
+    public ReturnStmt(Token t, Expression expr) {
+        super(t);
+        this.expr = expr;
+
+        children.add(this.expr);
         setParent();
     }
 
-    public Expression getReturnExpr() { return returnExpr; }
+    public Expression getExpr() { return expr; }
+    public Type getReturnType() { return type; }
 
     @Override
     public AST whosThatNode(PokeVisitor v) { return v.itsReturnStmt(this); }

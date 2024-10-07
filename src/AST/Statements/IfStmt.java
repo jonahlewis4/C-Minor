@@ -4,43 +4,29 @@ import AST.*;
 import AST.Expressions.*;
 import Utilities.PokeVisitor;
 
-/*
-----------------------------------------------------------------------
-                                IFSTMT
-----------------------------------------------------------------------
-Fields:
-    1. condExpr: Expression representing the condition
-    2. ifBlock: Block statement representing if block
-    3. elseBlock: Block statement representing else block
-*/
 public class IfStmt extends Statement {
 
-    Expression condExpr;
+    Expression cond;
     BlockStmt ifBlock;
     BlockStmt elseBlock;
 
-    public IfStmt(Expression condExpr, BlockStmt ifBlock) { this(condExpr,ifBlock,null); }
+    public IfStmt(Expression cond, BlockStmt ifBlock) { this(cond,ifBlock,null); }
 
-    public IfStmt(Expression condExpr, BlockStmt ifBlock, BlockStmt elseBlock) {
-        this.condExpr = condExpr;
+    public IfStmt(Expression cond, BlockStmt ifBlock, BlockStmt elseBlock) {
+        this.cond = cond;
         this.ifBlock = ifBlock;
         this.elseBlock = elseBlock;
 
-        addChild(this.condExpr);
+        addChild(this.cond);
         addChild(this.ifBlock);
         addChild(this.elseBlock);
         setParent();
     }
 
-    public Expression getCondExpr() { return this.condExpr; }
+    public Expression getCondition() { return cond; }
     public BlockStmt getIfBlock() { return ifBlock; }
     public BlockStmt getElseBlock() { return elseBlock; }
 
-    /*
-    ----------------------------------------------------------------------
-                                Visitor Method
-    ----------------------------------------------------------------------
-    */
     @Override
     public AST whosThatNode(PokeVisitor v) { return v.itsIfStmt(this); }
 }

@@ -10,11 +10,11 @@ public class ExprStmt extends Statement {
 
     public ExprStmt(Expression myExpr) {
         this.myExpr = myExpr;
+
         addChild(this.myExpr);
-        setParent();
     }
 
-    public Expression getMyExpr() { return this.myExpr; }
+    public Expression getMyExpr() { return myExpr; }
 
     @Override
     public AST whosThatNode(PokeVisitor v) { return v.itsExprStmt(this); }

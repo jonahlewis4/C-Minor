@@ -5,16 +5,20 @@ import Utilities.PokeVisitor;
 
 public class FieldExpr extends Expression {
 
-    public FieldExpr(Token t, Expression fieldTarget, Name fieldName) {
-        super(t);
-        addChild(fieldTarget);
-        addChild(fieldName);
-        childCount = 2;
+    Expression target;
+    Name name;
+
+    public FieldExpr(Expression fieldTarget, Name fieldName) {
+        target = fieldTarget;
+        name = fieldName;
+
+        addChild(target);
+        addChild(name);
     }
 
-    public Expression getFieldTarget() { return (Expression) children.get(0); }
-    public Name getFieldName() { return (Name) children.get(1); }
+    public Expression getFieldTarget() { return target; }
+    public String getFieldID() { return name.getName(); }
 
     @Override
-    public AST whosThatNode(PokeVisitor v) { return v.itsFieldRef(this); }
+    public AST whosThatNode(PokeVisitor v) { return v.itsFieldExpr(this); }
 }

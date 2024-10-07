@@ -4,37 +4,28 @@ import AST.AST;
 import AST.Expressions.*;
 import Utilities.PokeVisitor;
 
-/*
-----------------------------------------------------------------------
-                                DOSTMT
-----------------------------------------------------------------------
-Fields:
-    1. blockStmt: Block statement representing do block
-    2. nextExpr: Expression representing next condition
-    3. whileExpr: Expression representing while condition
-*/
-public class DoStmt extends AST {
+public class DoStmt extends Statement {
 
     BlockStmt doBlock;
     Expression nextExpr;
-    Expression whileExpr;
+    Expression cond;
 
-    public DoStmt(BlockStmt doBlock, Expression whileExpr) { this(doBlock,null,whileExpr); }
+    public DoStmt(BlockStmt doBlock, Expression cond) { this(doBlock,null,cond); }
 
-    public DoStmt(BlockStmt doBlock, Expression nextExpr, Expression whileExpr) {
+    public DoStmt(BlockStmt doBlock, Expression nextExpr, Expression cond) {
         this.doBlock = doBlock;
         this.nextExpr = nextExpr;
-        this.whileExpr = whileExpr;
+        this.cond = cond;
 
         addChild(this.doBlock);
         addChild(this.nextExpr);
-        addChild(this.whileExpr);
+        addChild(this.cond);
         setParent();
     }
 
     public BlockStmt getDoBlock() { return doBlock; }
     public Expression getNextExpr() { return nextExpr; }
-    public Expression getWhileExpr() { return whileExpr; }
+    public Expression getCondition() { return cond; }
 
     @Override
     public AST whosThatNode(PokeVisitor v) { return v.itsDoStmt(this); }

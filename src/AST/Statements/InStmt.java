@@ -1,19 +1,21 @@
 package AST.Statements;
 
 import AST.*;
+import AST.Expressions.Expression;
 import Utilities.PokeVisitor;
 
 public class InStmt extends Statement {
 
-    Sequence inExprs;
+    Sequence exprs;
 
-    public InStmt(Sequence inExprs) {
-        this.inExprs = inExprs;
-        addChild(this.inExprs);
+    public InStmt(Sequence exprs) {
+        this.exprs = exprs;
+
+        addChild(this.exprs);
         setParent();
     }
 
-    public Sequence getInExprs() { return inExprs; }
+    public Sequence getInExprs() { return exprs; }
 
     @Override
     public AST whosThatNode(PokeVisitor v) { return v.itsInStmt(this); }

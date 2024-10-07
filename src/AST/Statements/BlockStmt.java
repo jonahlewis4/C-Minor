@@ -1,32 +1,25 @@
 package AST.Statements;
 
 import AST.*;
+import Token.*;
 import Utilities.PokeVisitor;
 
-/*
-----------------------------------------------------------------------
-                                BLOCKSTMT
-----------------------------------------------------------------------
-Fields:
-    1. varSeq: Sequence of variables inside block
-    2. stmtSeq: Sequence of statements inside block
-*/
+
 public class BlockStmt extends Statement {
 
-    Sequence varSeq;
-    Sequence stmtSeq;
+    //TODO: Add a SymbolTable object here
 
-    public BlockStmt(Sequence varSeq, Sequence stmtSeq) {
-        this.varSeq = varSeq;
-        this.stmtSeq = stmtSeq;
+    Sequence varDecls;
+    Sequence stmts;
 
-        addChild(this.varSeq);
-        addChild(this.stmtSeq);
-        setParent();
+    public BlockStmt(Token t, Sequence varDecls, Sequence stmts) {
+        super(t);
+        this.varDecls = varDecls;
+        this.stmts = stmts;
     }
 
-    public Sequence getVarSeq() { return this.varSeq; }
-    public Sequence getStmtSeq() { return this.stmtSeq; }
+    public Sequence getVarDecls() { return varDecls; }
+    public Sequence getStmts() { return stmts; }
 
     @Override
     public AST whosThatNode(PokeVisitor v) { return v.itsBlockStmt(this); }

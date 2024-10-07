@@ -4,15 +4,6 @@ import AST.*;
 import AST.Expressions.*;
 import Utilities.PokeVisitor;
 
-/*
-----------------------------------------------------------------------
-                                CHOICESTMT
-----------------------------------------------------------------------
-Fields:
-    1. choiceExpr: Expression representing the while condition
-
-*/
-
 public class ChoiceStmt extends Statement {
 
     Expression choiceExpr;
@@ -27,7 +18,6 @@ public class ChoiceStmt extends Statement {
         addChild(this.choiceExpr);
         addChild(this.caseStmts);
         addChild(this.block);
-        setParent();
     }
 
     public Expression getChoiceExpr() { return choiceExpr; }
