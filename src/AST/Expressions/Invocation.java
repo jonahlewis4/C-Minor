@@ -2,30 +2,41 @@ package AST.Expressions;
 
 import AST.*;
 import AST.Types.*;
+import Token.*;
 import Utilities.PokeVisitor;
 
 public class Invocation extends Expression {
 
-    Expression target;
-    Name funcName;
-    Sequence params;
-
     public Type targetType;
 
-    public Invocation(Name funcName, Sequence params) { this(null, funcName, params); }
+    private Expression target;
+    private Name name;
+    private Vector<Expression> args;
 
-    public Invocation(Expression target, Name funcName, Sequence params) {
-        this.target = target;
-        this.funcName = funcName;
-        this.params = params;
+    public Invocation(Token t, Name fn, Vector<Expression> p) { this(t,null, fn, p); }
+    public Invocation(Token t, Expression e, Vector<Expression> p) { this(t,e,null,p); }
+
+    public Invocation(Token t, Expression e, Name fn, Vector<Expression> p) {
+        super(t);
+        this.target = e;
+        this.name = fn;
+        this.args = p;
 
         addChild(this.target);
-        addChild(this.funcName);
-        addChild(this.params);
+        addChild(this.name);
+        addChild(this.args);
+        setParent();
     }
 
-    //TODO: IMPLEMENT MORE METHODS LATER
-    
+    public Expression getTargetExpression() { return target; }
+    public Name getName() { return name; }
+    public Vector<Expression> getArguments() { return args; }
+
+    public boolean isInvocation() { return true; }
+
+    @Override
+    public String toString() { return name.toString(); }
+
     @Override
     public AST whosThatNode(PokeVisitor v) { return v.itsInvocation(this); }
 }

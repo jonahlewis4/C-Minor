@@ -1,23 +1,28 @@
 package AST.Statements;
 
 import AST.*;
+import Token.*;
 import Utilities.PokeVisitor;
 
 public class CaseStmt extends Statement {
 
-    ChoiceLabel myLabel;
-    BlockStmt myBlock;
+    private Label myLabel;
+    private BlockStmt myBlock;
 
-    public CaseStmt(ChoiceLabel myLabel, BlockStmt myBlock) {
-        this.myLabel = myLabel;
-        this.myBlock = myBlock;
+    public CaseStmt(Token t, Label l, BlockStmt b) {
+        super(t);
+        this.myLabel = l;
+        this.myBlock = b;
 
         addChild(this.myLabel);
         addChild(this.myBlock);
+        setParent();
     }
 
-    public ChoiceLabel getChoiceLabel() { return myLabel; }
+    public Label getChoiceLabel() { return myLabel; }
     public BlockStmt getBlockStmt() { return myBlock; }
+
+    public boolean isCaseStmt() { return true; }
 
     @Override
     public AST whosThatNode(PokeVisitor v) { return v.itsCaseStmt(this); }

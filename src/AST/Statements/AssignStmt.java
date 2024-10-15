@@ -2,15 +2,18 @@ package AST.Statements;
 
 import AST.*;
 import AST.Expressions.*;
+import AST.Operators.*;
+import Token.*;
 import Utilities.PokeVisitor;
 
 public class AssignStmt extends Statement {
 
-    Expression LHS;
-    Expression RHS;
-    AssignOp op;
+    private Expression LHS;
+    private Expression RHS;
+    private AssignOp op;
 
-    public AssignStmt(Expression LHS, Expression RHS, AssignOp op) {
+    public AssignStmt(Token t, Expression LHS, Expression RHS, AssignOp op) {
+        super(t);
         this.LHS = LHS;
         this.RHS = RHS;
         this.op = op;
@@ -24,6 +27,8 @@ public class AssignStmt extends Statement {
     public Expression getLHS() { return this.LHS; }
     public Expression getRHS() { return this.RHS; }
     public AssignOp getOp() { return this.op; }
+
+    public boolean isAssignStmt() { return true; }
 
     @Override
     public AST whosThatNode(PokeVisitor v) { return v.itsAssignStmt(this); }

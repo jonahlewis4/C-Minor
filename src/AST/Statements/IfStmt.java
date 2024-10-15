@@ -2,20 +2,24 @@ package AST.Statements;
 
 import AST.*;
 import AST.Expressions.*;
+import Token.*;
 import Utilities.PokeVisitor;
 
 public class IfStmt extends Statement {
 
-    Expression cond;
-    BlockStmt ifBlock;
-    BlockStmt elseBlock;
+    private Expression cond;
+    private BlockStmt ifBlock;
+    private Vector<IfStmt> elifStmts;
+    private BlockStmt elseBlock;
 
-    public IfStmt(Expression cond, BlockStmt ifBlock) { this(cond,ifBlock,null); }
-
-    public IfStmt(Expression cond, BlockStmt ifBlock, BlockStmt elseBlock) {
-        this.cond = cond;
-        this.ifBlock = ifBlock;
-        this.elseBlock = elseBlock;
+    public IfStmt(Token t, Expression c, BlockStmt ib) { this(t,c,ib,null,null); }
+    public IfStmt(Token t, Expression c, BlockStmt ib, Vector<IfStmt> es) { this(t,c,ib,es,null); }
+    public IfStmt(Token t, Expression c, BlockStmt ib, Vector<IfStmt> es, BlockStmt eb) {
+        super(t);
+        this.cond = c;
+        this.ifBlock = ib;
+        this.elifStmts = es;
+        this.elseBlock = eb;
 
         addChild(this.cond);
         addChild(this.ifBlock);
@@ -25,7 +29,10 @@ public class IfStmt extends Statement {
 
     public Expression getCondition() { return cond; }
     public BlockStmt getIfBlock() { return ifBlock; }
+    public Vector<IfStmt> getElifStmts() { return elifStmts; }
     public BlockStmt getElseBlock() { return elseBlock; }
+
+    public boolean isIfStmt() { return true; }
 
     @Override
     public AST whosThatNode(PokeVisitor v) { return v.itsIfStmt(this); }

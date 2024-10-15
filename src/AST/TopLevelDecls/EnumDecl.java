@@ -8,18 +8,29 @@ public class EnumDecl extends TopLevelDecl {
 
     private Name name;
     private Type type;
-    private Sequence enumFields;
+    private Vector<Var> enumFields;
 
-    public EnumDecl(Name name, Type type, Sequence enumFields) {
+    public EnumDecl(Name name, Vector<Var> ef) { this(name, null, ef); }
+
+    public EnumDecl(Name name, Type type, Vector<Var> ef) {
         this.name = name;
         this.type = type;
-        this.enumFields = enumFields;
+        this.enumFields = ef;
+
+        addChild(this.name);
+        addChild(this.type);
+        addChild(this.enumFields);
+        setParent();
     }
 
-    public String getName() { return name.getName(); }
-    public Name getNameNode() { return name; }
-    public String getType() { return type.typeName(); }
-    public Sequence getEnumFields() { return enumFields;}
+    public Name getName() { return name; }
+    public Type getType() { return type; }
+    public Vector<Var> getEnumFields() { return enumFields;}
+
+    public boolean isEnumDecl() { return true; }
+
+    @Override
+    public String toString() { return name.toString(); }
 
     @Override
     public AST whosThatNode(PokeVisitor v) { return v.itsEnumDecl(this); }

@@ -5,10 +5,19 @@ import AST.Types.*;
 import Token.*;
 
 public abstract class Expression extends AST {
-    public Type type = null;
 
-    public Expression() { super(); }
+    public Type type;
+
     public Expression(Token t) { super(t); }
-    public Expression(AST node) { super(node); }
-    //TODO: Constant functions?
+
+    public boolean isBinaryExpr() { return false; }
+    public boolean isCastExpr() { return false; }
+    public boolean isInvocation() { return false; }
+    public boolean isLiteral() { return false; }
+    public boolean isListLiteral() { return false; }
+    public boolean isNameExpr() { return false; }
+    public boolean isNewExpr() { return false; }
+    public boolean isInStmt() { return false; }
+    public boolean isOutStmt() { return false; }
+    public boolean isUnaryExpr() { return false; }
 }

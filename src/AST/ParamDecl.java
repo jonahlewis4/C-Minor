@@ -1,26 +1,33 @@
 package AST;
 
 import AST.Types.*;
+import Token.*;
 import Utilities.PokeVisitor;
 
 public class ParamDecl extends AST implements VarDecl {
 
-    private Type myType;
+    private Modifier mod;
     private Name name;
+    private Type type;
 
-    public ParamDecl(Name name, Type myType) {
-        this.name = name;
-        this.myType = myType;
+    public ParamDecl(Token t, Modifier m, Name n, Type type) {
+        super(t);
+        this.mod = m;
+        this.name = n;
+        this.type = type;
 
+        addChild(this.mod);
         addChild(this.name);
-        addChild(this.myType);
+        addChild(this.type);
+        setParent();
     }
 
-    public Type getType() { return myType; }
-    public String getID() { return name.getName(); }
+    public Type getType() { return type; }
+    @Override
+    public String toString() { return name.toString(); }
 
-    public boolean isClassType() { return myType instanceof ClassType; }
-
+    public boolean isClassType() { return type instanceof ClassType; }
+    public boolean isConstant() { return false; }
 
     @Override
     public AST whosThatNode(PokeVisitor v) { return v.itsParamDecl(this); }

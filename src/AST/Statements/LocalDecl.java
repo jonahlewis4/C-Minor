@@ -2,24 +2,33 @@ package AST.Statements;
 
 import AST.*;
 import AST.Types.*;
+import Token.*;
 import Utilities.PokeVisitor;
 
-//TODO: More helper methods?
 public class LocalDecl extends Statement implements VarDecl {
 
-    Var myVar;
+    private Var myVar;
+    private Type type;
 
-    public LocalDecl(Var myVar) {
-        this.myVar = myVar;
+    public LocalDecl(Token t, Var v, Type type) {
+        super(t);
+        this.myVar = v;
+        this.type = type;
 
-        addChild(myVar);
+        addChild(this.myVar);
+        addChild(this.type);
+        setParent();
     }
 
-    public Var getMyVar() { return myVar; }
-    public String getID() { return myVar.getID(); }
-    public Type getType() { return myVar.getType(); }
+    public Var getVar() { return myVar; }
 
-    public boolean isClassType() { return myVar.getType() instanceof ClassType; }
+    public Type getType() { return type; }
+    public String toString() { return myVar.toString(); }
+
+    public boolean isClassType() { return false; }
+    public boolean isConstant() { return false;}
+
+    public boolean isLocalDecl() { return true; }
 
     @Override
     public AST whosThatNode(PokeVisitor v) { return v.itsLocalDecl(this); }

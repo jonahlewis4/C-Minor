@@ -2,19 +2,24 @@ package AST.Statements;
 
 import AST.*;
 import AST.Expressions.*;
+import Token.*;
 import Utilities.PokeVisitor;
 
 public class ExprStmt extends Statement {
 
-    Expression myExpr;
+    private Expression expr;
 
-    public ExprStmt(Expression myExpr) {
-        this.myExpr = myExpr;
+    public ExprStmt(Token t, Expression e) {
+        super(t);
+        this.expr = e;
 
-        addChild(this.myExpr);
+        addChild(this.expr);
+        setParent();
     }
 
-    public Expression getMyExpr() { return myExpr; }
+    public Expression getExpression() { return expr; }
+
+    public boolean isExprStmt() { return true; }
 
     @Override
     public AST whosThatNode(PokeVisitor v) { return v.itsExprStmt(this); }

@@ -1,23 +1,36 @@
 package AST.Expressions;
 
 import AST.*;
+import Token.*;
 import Utilities.PokeVisitor;
 
 public class FieldExpr extends Expression {
 
-    Expression target;
-    Name name;
+    private Expression target;
+    private Name name;
 
-    public FieldExpr(Expression fieldTarget, Name fieldName) {
-        target = fieldTarget;
-        name = fieldName;
+    private boolean asCheck;
 
-        addChild(target);
-        addChild(name);
+    public FieldExpr(Token t, Expression ft, Name fn, boolean ac) {
+        super(t);
+        this.target = ft;
+        this.name = fn;
+
+        this.asCheck = ac;
+
+        addChild(this.target);
+        addChild(this.name);
+        setParent();
     }
 
     public Expression getFieldTarget() { return target; }
-    public String getFieldID() { return name.getName(); }
+    public Name getName() { return name; }
+
+    public boolean isAsCheck() { return asCheck; }
+    public boolean isFieldExpr() { return true; }
+
+    @Override
+    public String toString() { return name.toString(); }
 
     @Override
     public AST whosThatNode(PokeVisitor v) { return v.itsFieldExpr(this); }

@@ -4,23 +4,26 @@ import AST.*;
 import Token.*;
 import Utilities.PokeVisitor;
 
-
+//TODO: Add a SymbolTable here
 public class BlockStmt extends Statement {
 
-    //TODO: Add a SymbolTable object here
+    Vector<LocalDecl> varDecls;
+    Vector<Statement> stmts;
 
-    Sequence varDecls;
-    Sequence stmts;
-
-    public BlockStmt(Token t, Sequence varDecls, Sequence stmts) {
+    public BlockStmt(Token t, Vector<LocalDecl> vd, Vector<Statement> s) {
         super(t);
-        this.varDecls = varDecls;
-        this.stmts = stmts;
+        this.varDecls = vd;
+        this.stmts = s;
+
+        addChild(this.varDecls);
+        addChild(this.stmts);
+        setParent();
     }
 
-    public Sequence getVarDecls() { return varDecls; }
-    public Sequence getStmts() { return stmts; }
+    public Vector<LocalDecl> getVarDecls() { return varDecls; }
+    public Vector<Statement> getStmts() { return stmts; }
 
+    public boolean isBlockStmt() { return true; }
     @Override
     public AST whosThatNode(PokeVisitor v) { return v.itsBlockStmt(this); }
 }

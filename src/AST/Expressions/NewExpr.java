@@ -2,25 +2,28 @@ package AST.Expressions;
 
 import AST.*;
 import AST.Types.*;
+import Token.*;
 import Utilities.PokeVisitor;
 
-// class name (type) and argument list (expression)
 public class NewExpr extends Expression {
 
-    ClassType myType;
-    Sequence args;
+    private ClassType cType;
+    private Vector<Var> fields;
 
-    public NewExpr(ClassType className, Sequence arguments) {
-        super(className);
-        this.myType = className;
-        this.args = arguments;
+    public NewExpr(Token t, ClassType ct, Vector<Var> f) {
+        super(t);
+        this.cType = ct;
+        this.fields = f;
 
-        addChild(this.myType);
-        addChild(this.args);
+        addChild(this.cType);
+        addChild(this.fields);
+        setParent();
     }
 
-    public Type getClassType() { return this.myType; }
-    public Sequence getArguments() { return this.args; }
+    public ClassType getClassType() { return cType; }
+    public Vector<Var> getArguments() { return fields; }
+
+    public boolean isNewExpr() { return true; }
 
     @Override
     public AST whosThatNode(PokeVisitor v) { return v.itsNewExpr(this); }

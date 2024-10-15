@@ -10,19 +10,24 @@ import Utilities.PokeVisitor;
 public class ReturnStmt extends Statement {
 
     private Type type;
+    private Expression expr;
 
-    Expression expr;
+    public ReturnStmt(Token t, Type rt) { this(t,rt,null); }
 
-    public ReturnStmt(Token t, Expression expr) {
+    public ReturnStmt(Token t, Type rt, Expression e) {
         super(t);
-        this.expr = expr;
+        this.type = rt;
+        this.expr = e;
 
-        children.add(this.expr);
+        addChild(this.type);
+        addChild(this.expr);
         setParent();
     }
 
-    public Expression getExpr() { return expr; }
     public Type getReturnType() { return type; }
+    public Expression getExpression() { return expr; }
+
+    public boolean isReturnStmt() { return true; }
 
     @Override
     public AST whosThatNode(PokeVisitor v) { return v.itsReturnStmt(this); }

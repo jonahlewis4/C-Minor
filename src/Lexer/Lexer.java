@@ -2,7 +2,6 @@ package Lexer;
 
 import Token.*;
 
-//TODO: Clean up :)
 /*
                     -------------------
                        C Minor Lexer

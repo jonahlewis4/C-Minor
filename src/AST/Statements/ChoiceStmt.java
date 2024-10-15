@@ -2,28 +2,35 @@ package AST.Statements;
 
 import AST.*;
 import AST.Expressions.*;
+import Token.*;
 import Utilities.PokeVisitor;
 
 public class ChoiceStmt extends Statement {
 
-    Expression choiceExpr;
-    Sequence caseStmts;
-    BlockStmt block;
+    private Expression expr;
+    private Vector<CaseStmt> caseStmts;
+    private BlockStmt block;
 
-    public ChoiceStmt(Expression choiceExpr, Sequence caseStmts, BlockStmt block) {
-        this.choiceExpr = choiceExpr;
-        this.caseStmts = caseStmts;
-        this.block = block;
+    public ChoiceStmt(Token t, Expression e, BlockStmt b) { this(t,e,null,b); }
 
-        addChild(this.choiceExpr);
+    public ChoiceStmt(Token t, Expression e, Vector<CaseStmt> cs, BlockStmt b) {
+        super(t);
+        this.expr = e;
+        this.caseStmts = cs;
+        this.block = b;
+
+        addChild(this.expr);
         addChild(this.caseStmts);
         addChild(this.block);
+        setParent();
     }
 
-    public Expression getChoiceExpr() { return choiceExpr; }
-    public Sequence getCaseStmts() { return caseStmts; }
+    public Expression getChoiceExpr() { return expr; }
+    public Vector<CaseStmt> getCaseStmts() { return caseStmts; }
     public BlockStmt getBlock() { return block; }
 
+    public boolean isChoiceStmt() { return true; }
+    
     @Override
     public AST whosThatNode(PokeVisitor v) { return v.itsChoiceStmt(this); }
 }
