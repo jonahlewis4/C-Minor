@@ -2,11 +2,11 @@ package Token;
 
 public class Location {
 
-    private Position start;
-    private Position end;
+    public Position start;
+    public Position end;
 
     public Location() {
-        this.start = new Position(1,1);
+        this.start = new Position(1,0);
         this.end = new Position(1,1);
     }
 
@@ -23,7 +23,11 @@ public class Location {
         start.column = end.column;
     }
 
-    public Location copy() { return new Location(start.copy(), end.copy()); }
+    public Location copy() {
+        Location loc = new Location(start.copy(), end.copy());
+        this.start.addToCol();
+        return loc;
+    }
 
     @Override
     public String toString() {
