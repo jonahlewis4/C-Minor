@@ -1,7 +1,23 @@
 package Parser;
 
+import AST.*;
+import AST.Modifier.*;
+import AST.ClassBody.*;
+import AST.Expressions.*;
+import AST.Expressions.Literal.*;
+import AST.Operators.*;
+import AST.Operators.AssignOp.*;
+import AST.Operators.BinaryOp.*;
+import AST.Operators.UnaryOp.*;
+import AST.Statements.*;
+import AST.TopLevelDecls.*;
+import AST.Types.*;
+import AST.Types.ScalarType.*;
+import AST.Types.DiscreteType.*;
 import Lexer.*;
 import Token.*;
+
+import java.lang.reflect.Array;
 import java.util.ArrayList;
 
 public class Parser {
@@ -20,37 +36,36 @@ public class Parser {
     }
 
     private void consume() {
-        lookaheads[lookPos] = this.input.nextToken();
-        lookaheads[lookPos].toString();
-        lookPos = (lookPos + 1) % k;
+        if(lookaheads[lookPos] != null)
+            System.out.println((lookaheads[lookPos]).toString());
+            lookaheads[lookPos] = this.input.nextToken();
+            lookPos = (lookPos + 1) % k;
     }
 
     private void match(TokenType expectedTok) {
         if(nextLA(expectedTok)) consume();
-        else throw new IllegalArgumentException("\nWarning! Expected " + expectedTok + ", but got " + currentLA(0).getTokenType());
+        else throw new IllegalArgumentException("\nWarning! Expected " + expectedTok +
+                                                ", but got " + currentLA(0).getTokenType());
+    }
+
+    private void match(TokenType expectedTok, Token t) {
+        if(nextLA(expectedTok)) {
+            if(t != currentLA())
+                t.appendText(" " + currentLA().getText());
+            t.newEndLocation(currentLA().getLocation());
+            consume();
+        }
+        else throw new IllegalArgumentException("\nWarning! Expected " + expectedTok +
+                                                ", but got " + currentLA(0).getTokenType());
     }
 
     // currentLA : Returns the current token we are checking
+    private Token currentLA() { return lookaheads[lookPos%k]; }
     private Token currentLA(int nextPos) { return lookaheads[(lookPos+nextPos)%k]; }
 
     // nextLA : Returns the next LA at the specified index
     private boolean nextLA(TokenType expectedTok) { return currentLA(0).getTokenType() == expectedTok; }
-
     private boolean nextLA(TokenType expectedTok, int nextPos) { return currentLA(nextPos).getTokenType() == expectedTok; }
-
-    private boolean anyLA(ArrayList<TokenType> tokens, int nextPos) {
-        for(TokenType expectedTok : tokens) {
-            if(nextLA(expectedTok,nextPos)) return true;
-        }
-        return false;
-    }
-
-    private boolean anyLA(ArrayList<TokenType> tokens) {
-        for(TokenType expectedTok : tokens) {
-            if(nextLA(expectedTok)) return true;
-        }
-        return false;
-    }
 
     private boolean isEnumFIRST() {
         return isScalarTypeFIRST() ||
@@ -91,7 +106,8 @@ public class Parser {
                nextLA(TokenType.DO) ||
                nextLA(TokenType.CHOICE) ||
                nextLA(TokenType.CIN) ||
-               nextLA(TokenType.COUT);
+               nextLA(TokenType.COUT) ||
+               nextLA(TokenType.STOP);
     }
 
     private boolean isPrimExprFIRST() {
@@ -143,108 +159,31 @@ public class Parser {
     */
 
     // 1. compilation ::= file_merge* enum_type* global_variable* class_type* function* main
-    public void compilation() {
-        while(nextLA(TokenType.INCLUDE) || nextLA(TokenType.EXCLUDE))
-            fileMerge();
+    public Compilation compilation() {
+        Token t = currentLA();
 
+        Vector<EnumDecl> enums = new Vector<EnumDecl>();
         while(nextLA(TokenType.DEF) && nextLA(TokenType.ID,1))
-            enumType();
+            enums.append(enumType());
 
+        Vector<GlobalDecl> globals = new Vector<GlobalDecl>();
         while(nextLA(TokenType.DEF) && (nextLA(TokenType.CONST, 1) || nextLA(TokenType.GLOBAL, 1)))
-            globalVariable();
+            globals.merge(globalVariable());
 
+        Vector<ClassDecl> classes = new Vector<ClassDecl>();
         while(nextLA(TokenType.ABSTR) || nextLA(TokenType.FINAL) || nextLA(TokenType.CLASS))
-            classType();
+            classes.append(classType());
 
+        Vector<FuncDecl> funcs = new Vector<FuncDecl>();
         while((nextLA(TokenType.DEF)) && !nextLA(TokenType.MAIN,1))
-                function();
+                funcs.append(function());
 
-        mainFunc();
+        MainDecl md = mainFunc();
 
         if(!nextLA(TokenType.EOF))
             System.out.println("EOF Not Reached.");
+        return new Compilation(t,enums,globals,classes,funcs,md);
     }
-
-
-    /*
-    ------------------------------------------------------------
-                          COMPILER DIRECTIVES
-    ------------------------------------------------------------
-    */
-
-
-    // 2. file_merge ::= '#include' filename choice? rename?
-    //                 | '#exclude' choice
-    private void fileMerge() {
-        if(nextLA(TokenType.INCLUDE)) {
-            match(TokenType.INCLUDE);
-            fileName();
-            if(nextLA(TokenType.ONLY)) choice();
-            if(nextLA(TokenType.RENAME)) rename();
-        }
-        else {
-            match(TokenType.EXCLUDE);
-            choice();
-        }
-    }
-
-
-    // 3. filename ::= STRING_LITERAL
-    private void fileName() { match(TokenType.STR_LIT); }
-
-
-    // 4. choice ::= 'only' '{' global_id ( ',' global_id )* '}'
-    //             | 'except' '{' global_id ( ',' global_id )* '}'
-    private void choice() {
-        if(nextLA(TokenType.ONLY)) {
-            match(TokenType.ONLY);
-            match(TokenType.LBRACE);
-            globalID();
-            while(nextLA(TokenType.COMMA)) {
-                match(TokenType.COMMA);
-                globalID();
-            }
-            match(TokenType.RBRACE);
-        }
-        else {
-            match(TokenType.EXCEPT);
-            match(TokenType.LBRACE);
-            globalID();
-            while(nextLA(TokenType.COMMA)) {
-                match(TokenType.COMMA);
-                globalID();
-            }
-            match(TokenType.RBRACE);
-        }
-    }
-
-
-    // 5. global_id ::= ID
-    private void globalID() {
-        match(TokenType.ID);
-    }
-
-
-    // 6. rename ::= 'rename' '{' change_id ( ',' change_id )* '}'
-    private void rename() {
-        match(TokenType.RENAME);
-        match(TokenType.LBRACE);
-        changeID();
-        while(nextLA(TokenType.COMMA)) {
-            match(TokenType.COMMA);
-            changeID();
-        }
-        match(TokenType.RBRACE);
-    }
-
-
-    // 7. change-id ::= ID => ID
-    private void changeID() {
-        match(TokenType.ID);
-        match(TokenType.ARROW);
-        match(TokenType.ID);
-    }
-
 
     /*
     ------------------------------------------------------------
@@ -252,37 +191,42 @@ public class Parser {
     ------------------------------------------------------------
     */
 
-
-    // 8. enum_type ::= 'def' ID type? 'type' '=' '{' enum_field ( ',' , enum_field)* '}'
-    private void enumType() {
+    // 2. enum_type ::= 'def' ID type? 'type' '=' '{' enum_field ( ',' , enum_field)* '}'
+    private EnumDecl enumType() {
+        Token t = currentLA();
         match(TokenType.DEF);
+        Name n = new Name(currentLA());
         match(TokenType.ID);
 
-        if(isEnumFIRST()) type();
+        Type ty = null;
+        if(isEnumFIRST()) ty = type();
 
         match(TokenType.TYPE);
         match(TokenType.EQ);
         match(TokenType.LBRACE);
 
-        enumField();
+        Vector<Var> vars = new Vector<Var>(enumField());
 
         while(nextLA(TokenType.COMMA)) {
             match(TokenType.COMMA);
-            enumField();
+            vars.append(enumField());
         }
         match(TokenType.RBRACE);
+        return new EnumDecl(t,n,ty,vars);
     }
 
-
-    // 9. enum_field ::= 'ID' ( '=' constant )?
-    private void  enumField() {
+    // 3. enum_field ::= 'ID' ( '=' constant )?
+    private Var enumField() {
+        Token t = currentLA();
+        Name n = new Name(t);
         match(TokenType.ID);
         if(nextLA(TokenType.EQ)) {
-            match(TokenType.EQ);
-            constant();
+            match(TokenType.EQ,t);
+            Expression e = constant();
+            return new Var(t,n,e);
         }
+        return new Var(t,n);
     }
-
 
     /*
     ------------------------------------------------------------
@@ -290,41 +234,51 @@ public class Parser {
     ------------------------------------------------------------
     */
 
-
     // 10. global_variable ::= 'def' ( 'const' | 'global' ) variable_decl
-    private void globalVariable() {
+    private Vector<GlobalDecl> globalVariable() {
+        Token t = currentLA();
         match(TokenType.DEF);
         if(nextLA(TokenType.CONST)) match(TokenType.CONST);
         else match(TokenType.GLOBAL);
-        variableDecl();
+        ArrayList<AST> vals = variableDecl();
+        Vector<GlobalDecl> globals = new Vector<GlobalDecl>();
+        for(int i = 0; i < vals.get(0).children.size(); i++) {
+            globals.append(new GlobalDecl(t, (Var)vals.get(0).children.get(i), (Type)vals.get(1)));
+        }
+        return globals;
     }
-
 
     // 11. variable_decl ::= variable_decl_list
-    private void variableDecl() { variableDeclList(); }
-
+    private ArrayList<AST> variableDecl() { return variableDeclList(); }
 
     // 12. variable_decl_list ::= variable_decl_init ( ',' variable_decl_init )* type
-    private void variableDeclList() {
-        variableDeclInit();
+    private ArrayList<AST> variableDeclList() {
+        Vector<Var> v = new Vector<Var>(variableDeclInit());
         while(nextLA(TokenType.COMMA)) {
             match(TokenType.COMMA);
-            variableDeclInit();
+            v.append(variableDeclInit());
         }
-        type();
+        Type t = type();
+        ArrayList<AST> ret = new ArrayList<AST>();
+        ret.add(v);
+        ret.add(t);
+        return ret;
     }
 
-
     // 13. variable_decl_init ::= ID ( '=' ( expression | 'uninit' ) )?
-    private void variableDeclInit() {
+    private Var variableDeclInit() {
+        Token t = currentLA();
+        Name n = new Name(currentLA());
         match(TokenType.ID);
         if(nextLA(TokenType.EQ)) {
             match(TokenType.EQ);
+            Expression e = null;
             if(nextLA(TokenType.UNINIT)) match(TokenType.UNINIT);
-            else expression();
+            else e = expression();
+            return new Var(t,n,e);
         }
+        return new Var(t,n);
     }
-
 
     /*
     ------------------------------------------------------------
@@ -332,19 +286,20 @@ public class Parser {
     ------------------------------------------------------------
     */
 
-
     // 14. type ::= scalar_type
     //            | class_name
     //            | 'List' '[' type ']'
     //            | 'Tuple' '<' type ( ',' type )* '>'
-    private void type() {
+    private Type type() {
         if(nextLA(TokenType.ID))
-            className();
+            return className();
         else if(nextLA(TokenType.LIST)) {
+            Token t = currentLA();
             match(TokenType.LIST);
-            match(TokenType.LBRACK);
-            type();
-            match(TokenType.RBRACK);
+            match(TokenType.LBRACK,t);
+            Type ty = type();
+            match(TokenType.RBRACK,t);
+            return new ListType(t,ty);
         }
         else if(nextLA(TokenType.TUPLE)) {
             match(TokenType.TUPLE);
@@ -356,14 +311,14 @@ public class Parser {
             }
             match(TokenType.GT);
         }
-        else scalarType();
+        return scalarType();
     }
-
 
     // 15. scalar_type ::= discrete_type
     //                   | 'String' ( '[' INT_LITERAL ']' )*
     //                   | 'Real' ( ':' INT_LITERAL )? ( '[' INT_LITERAL ']' )*
-    private void scalarType() {
+    private Type scalarType() {
+        Token t = currentLA();
         if(nextLA(TokenType.STRING)) {
             match(TokenType.STRING);
             while(nextLA(TokenType.LBRACK)) {
@@ -371,6 +326,7 @@ public class Parser {
                 match(TokenType.INT_LIT);
                 match(TokenType.RBRACK);
             }
+            return new ScalarType(t,Scalars.STR);
         }
         else if(nextLA(TokenType.REAL)) {
             match(TokenType.REAL);
@@ -383,15 +339,16 @@ public class Parser {
                 match(TokenType.INT_LIT);
                 match(TokenType.RBRACK);
             }
+            return new ScalarType(t,Scalars.REAL);
         }
-        else discreteType();
+        return discreteType();
     }
-
 
     // 16. discrete_type ::= 'Bool' ( '[' INT_LITERAL ']' )*
     //                     | 'Int' ( ':' INT_LITERAL '..' INT_LITERAL )? ( '[' INT_LITERAL ']' )*
     //                     | 'Char' ( ':' CHAR_LITERAL '..' CHAR_LITERAL )? ( '[' INT_LITERAL ']' )*
-    private void discreteType() {
+    private DiscreteType discreteType() {
+        Token t = currentLA();
         if(nextLA(TokenType.BOOL)) {
             match(TokenType.BOOL);
             while(nextLA(TokenType.LBRACK)) {
@@ -399,6 +356,7 @@ public class Parser {
                 match(TokenType.INT_LIT);
                 match(TokenType.RBRACK);
             }
+            return new DiscreteType(t, Discretes.BOOL);
         }
         else if(nextLA(TokenType.INT)) {
             match(TokenType.INT);
@@ -413,6 +371,7 @@ public class Parser {
                 match(TokenType.INT_LIT);
                 match(TokenType.RBRACK);
             }
+            return new DiscreteType(t, Discretes.INT);
         }
         else if(nextLA(TokenType.CHAR)) {
             match(TokenType.CHAR);
@@ -427,16 +386,18 @@ public class Parser {
                 match(TokenType.INT_LIT);
                 match(TokenType.RBRACK);
             }
+            return new DiscreteType(t, Discretes.CHAR);
         }
         else throw new IllegalStateException("Error! Invalid type entered!");
     }
 
-
     // 17. class_name ::= ID ( '<' type ( ',' type )* '>' )?
-    private void className() {
-        match(TokenType.ID);
+    private ClassType className() {
+        Token t = currentLA();
+        Name n = new Name(t);
+        match(TokenType.ID,t);
         if(nextLA(TokenType.LT)) {
-            match(TokenType.LT);
+            match(TokenType.LT,t);
             type();
             while(nextLA(TokenType.COMMA)) {
                 match(TokenType.COMMA);
@@ -444,8 +405,8 @@ public class Parser {
             }
             match(TokenType.GT);
         }
+        return new ClassType(t,n);
     }
-
 
     /*
     ------------------------------------------------------------
@@ -453,34 +414,46 @@ public class Parser {
     ------------------------------------------------------------
     */
 
-
     // 18. class_type ::= ( 'abstr' | 'final' )? 'class' ID type_params? super_class? class_body
-    private void classType() {
-        if(nextLA(TokenType.ABSTR)) match(TokenType.ABSTR);
-        else if(nextLA(TokenType.FINAL)) match(TokenType.FINAL);
+    private ClassDecl classType() {
+        Token t = currentLA();
+        Modifier m = null;
+        if(nextLA(TokenType.ABSTR)) {
+            m = new Modifier(t,Mods.ABSTR);
+            match(TokenType.ABSTR);
+        }
+        else if(nextLA(TokenType.FINAL)) {
+            m = new Modifier(t,Mods.FINAL);
+            match(TokenType.FINAL);
+        }
 
         match(TokenType.CLASS);
+        Name n = new Name(currentLA());
         match(TokenType.ID);
 
-        if(nextLA(TokenType.LT)) typeParams();
+        Vector<Type> types = null;
+        if(nextLA(TokenType.LT)) types = typeParams();
         if(nextLA(TokenType.INHERITS)) superClass();
 
-        classBody();
+        ClassBody body = classBody();
+        return new ClassDecl(t,m,n,body);
     }
-
 
     // 19. type_params ::= '<' type ( ',' type )* '>'
-    private void typeParams() {
+    private Vector<Type> typeParams() {
+        Vector<Type> types = new Vector<Type>();
+
         match(TokenType.LT);
-        type();
+        types.append(type());
         while(nextLA(TokenType.COMMA)) {
             match(TokenType.COMMA);
-            type();
+            types.append(type());
         }
         match(TokenType.GT);
+        return types;
     }
 
-
+    // TODO: LATER
     // 20. super_class ::= 'inherits' ID type_params?
     private void superClass() {
         match(TokenType.INHERITS);
@@ -488,20 +461,22 @@ public class Parser {
         if(nextLA(TokenType.LT)) typeParams();
     }
 
-
     // 21. class_body ::= '{' data_decl* method_decl* '}'
-    private void classBody() {
+    private ClassBody classBody() {
+        Token t = currentLA();
         match(TokenType.LBRACE);
 
+        Vector<DataDecl> dataDecls = new Vector<DataDecl>();
         while(isDataDeclFIRST() && nextLA(TokenType.ID,1))
-            dataDecl();
+           dataDecls.merge(dataDecl());
+
+        Vector<MethodDecl> methodDecls = new Vector<MethodDecl>();
         while(nextLA(TokenType.PROTECTED) || nextLA(TokenType.PUBLIC))
-            methodDecl();
+            methodDecls.append(methodDecl());
 
         match(TokenType.RBRACE);
+        return new ClassBody(t,dataDecls,methodDecls);
     }
-
-
 
     /*
     ------------------------------------------------------------
@@ -509,16 +484,29 @@ public class Parser {
     ------------------------------------------------------------
     */
 
-
     // 22. data_decl ::= ( 'property' | 'protected' | 'public' ) variable_decl
-    private void dataDecl() {
-        if(nextLA(TokenType.PROPERTY)) match(TokenType.PROPERTY);
-        else if(nextLA(TokenType.PROTECTED)) match(TokenType.PROTECTED);
-        else match(TokenType.PUBLIC);
+    private Vector<DataDecl> dataDecl() {
+        Token t = currentLA();
+        Modifier m = null;
+        if(nextLA(TokenType.PROPERTY)) {
+            match(TokenType.PROPERTY);
+            m = new Modifier(t,Mods.PROPERTY);
+        }
+        else if(nextLA(TokenType.PROTECTED)) {
+            match(TokenType.PROTECTED);
+            m = new Modifier(t,Mods.PROTECTED);
+        }
+        else {
+            match(TokenType.PUBLIC);
+            m = new Modifier(t,Mods.PUBLIC);
+        }
 
-        variableDecl();
+        ArrayList<AST> vars = variableDecl();
+        Vector<DataDecl> dataDecls = new Vector<DataDecl>();
+        for(int i = 0; i < vars.get(0).children.size(); i++)
+            dataDecls.append(new DataDecl(t,m,(Var)vars.get(0).children.get(i),(Type)vars.get(1)));
+        return dataDecls;
     }
-
 
     /*
     ------------------------------------------------------------
@@ -526,155 +514,235 @@ public class Parser {
     ------------------------------------------------------------
     */
 
-
     // 23. method_decl ::= method_class | operator_class
-    private void methodDecl() {
+    private MethodDecl methodDecl() {
         if(nextLA(TokenType.OPERATOR,1) || nextLA(TokenType.OPERATOR,2))
-            operatorClass();
-        else methodClass();
+            return operatorClass();
+        return methodClass();
     }
-
 
     // 24. method_class ::= method_modifier attribute* 'override'? 'method' method_header '=>' return_type block_statement
-    private void methodClass() {
-        methodModifier();
+    private MethodDecl methodClass() {
+        Token t = currentLA();
+        Vector<Modifier> mods = new Vector<Modifier>(methodModifier());
 
         while(nextLA(TokenType.FINAL) || nextLA(TokenType.PURE) || nextLA(TokenType.RECURS))
-            attribute();
+            mods.append(attribute());
 
-        if(nextLA(TokenType.OVERRIDE)) match(TokenType.OVERRIDE);
+        boolean override = false;
+        if(nextLA(TokenType.OVERRIDE)) {
+            match(TokenType.OVERRIDE);
+            override = true;
+        }
 
         match(TokenType.METHOD);
-        methodHeader();
+        ArrayList<AST> header = methodHeader();
         match(TokenType.ARROW);
-        returnType();
-        blockStatement();
+        Type rt = returnType();
+        BlockStmt bs = blockStatement();
+        return new MethodDecl(t,mods,(Name)header.get(0),null,(Vector<ParamDecl>)header.get(1),rt,bs,override);
     }
-
 
     // 25. method_modifier : 'protected' | 'public' ;
-    private void methodModifier() {
-        if(nextLA(TokenType.PROTECTED)) match(TokenType.PROTECTED);
-        else if(nextLA(TokenType.PUBLIC)) match(TokenType.PUBLIC);
-        else throw new IllegalStateException("Error! Invalid method modifier.");
+    private Modifier methodModifier() {
+        Token t = currentLA();
+        if(nextLA(TokenType.PROTECTED)) {
+            match(TokenType.PROTECTED);
+            return new Modifier(t, Mods.PROTECTED);
+        }
+        match(TokenType.PUBLIC);
+        return new Modifier(t, Mods.PUBLIC);
     }
-
 
     // 26. attribute ::= 'final' | 'pure' | 'recurs'
-    private void attribute() {
-        if(nextLA(TokenType.FINAL)) match(TokenType.FINAL);
-        else if(nextLA(TokenType.PURE)) match(TokenType.PURE);
-        else match(TokenType.RECURS);
+    private Modifier attribute() {
+        Token t = currentLA();
+        if(nextLA(TokenType.FINAL)) {
+            match(TokenType.FINAL);
+            return new Modifier(t,Mods.FINAL);
+        }
+        else if(nextLA(TokenType.PURE)) {
+            match(TokenType.PURE);
+            return new Modifier(t,Mods.PURE);
+        }
+        match(TokenType.RECURS);
+        return new Modifier(t,Mods.RECURS);
     }
-
 
     // 27. method-header ::= ID '(' formal-params? ')'
-    private void methodHeader() {
+    private ArrayList<AST> methodHeader() {
+        Name n = new Name(currentLA());
         match(TokenType.ID);
         match(TokenType.LPAREN);
+        Vector<ParamDecl> pd = null;
         if(nextLA(TokenType.IN) || nextLA(TokenType.OUT) || nextLA(TokenType.INOUT) || nextLA(TokenType.REF))
-                formalParams();
+                pd = formalParams();
         match(TokenType.RPAREN);
+        ArrayList<AST> ret = new ArrayList<AST>();
+        ret.add(n);
+        ret.add(pd);
+        return ret;
     }
 
-
     // 28. formal_params : param_modifier Name type ( ',' param_modifier Name type)*
-    private void formalParams() {
-        paramModifier();
+    private Vector<ParamDecl> formalParams() {
+        Vector<ParamDecl> pd = new Vector<ParamDecl>();
+        Modifier m = paramModifier();
+        Name n = new Name(currentLA());
         match(TokenType.ID);
-        type();
+        Type ty = type();
+
+        pd.append(new ParamDecl(m,n,ty));
 
         while(nextLA(TokenType.COMMA)) {
             match(TokenType.COMMA);
-            paramModifier();
+            m = paramModifier();
+            n = new Name(currentLA());
             match(TokenType.ID);
-            type();
+            ty = type();
+            pd.append(new ParamDecl(m,n,ty));
         }
+        return pd;
     }
-
 
     // 29. param_modifier : 'in' | 'out' | 'inout' | 'ref'
-    private void paramModifier() {
-        if(nextLA(TokenType.IN)) match(TokenType.IN);
-        else if(nextLA(TokenType.OUT)) match(TokenType.OUT);
-        else if(nextLA(TokenType.INOUT)) match(TokenType.INOUT);
+    private Modifier paramModifier() {
+        Token t = currentLA();
+        if(nextLA(TokenType.IN)) {
+            match(TokenType.IN);
+            return new Modifier(t,Mods.IN);
+        }
+        else if(nextLA(TokenType.OUT)) {
+            match(TokenType.OUT);
+            return new Modifier(t,Mods.OUT);
+        }
+        else if(nextLA(TokenType.INOUT)) {
+            match(TokenType.INOUT);
+            return new Modifier(t,Mods.INOUT);
+        }
         else if(nextLA(TokenType.IN) && nextLA(TokenType.OUT,1)) {
             match(TokenType.IN);
-            match(TokenType.OUT);
+            match(TokenType.OUT,t);
+            return new Modifier(t,Mods.INOUT);
         }
-        else if(nextLA(TokenType.REF)) match(TokenType.REF);
-        else throw new IllegalStateException("Error! Invalid parameter type was given.");
+        match(TokenType.REF);
+        return new Modifier(t,Mods.REF);
     }
-
 
     // 30. return-type ::= Void | type
-    private void returnType() {
-        if(nextLA(TokenType.VOID))
+    private Type returnType() {
+        if(nextLA(TokenType.VOID)) {
             match(TokenType.VOID);
-        else type();
+            return null;
+        }
+        return type();
     }
-
 
     // 31. operator_class : operator_modifier 'final'? 'operator' operator_header '=>' return_type block_statement
-    private void operatorClass() {
-        methodModifier();
+    private MethodDecl operatorClass() {
+        Token t = currentLA();
+        Vector<Modifier> mods = new Vector<Modifier>(methodModifier());
 
-        if(nextLA(TokenType.FINAL)) match(TokenType.FINAL);
+        if(nextLA(TokenType.FINAL)) {
+            mods.append(new Modifier(currentLA(),Mods.FINAL));
+            match(TokenType.FINAL);
+        }
 
         match(TokenType.OPERATOR);
-        operatorHeader();
+        ArrayList<AST> header = operatorHeader();
         match(TokenType.ARROW);
-        returnType();
-        blockStatement();
+        Type rt = returnType();
+        BlockStmt block = blockStatement();
+        return new MethodDecl(t,mods,null,(Operator)header.get(0),(Vector<ParamDecl>)header.get(1),rt,block,false);
     }
-
 
     // 32. operator_header ::= operator_symbol '(' formal-params? ')'
-    private void operatorHeader() {
-        operatorSymbol();
+    private ArrayList<AST> operatorHeader() {
+        Operator op = operatorSymbol();
 
         match(TokenType.LPAREN);
+        Vector<ParamDecl> pd = null;
         if(nextLA(TokenType.IN) || nextLA(TokenType.OUT) || nextLA(TokenType.INOUT) || nextLA(TokenType.REF))
-            formalParams();
+            pd = formalParams();
         match(TokenType.RPAREN);
+        ArrayList<AST> ret = new ArrayList<AST>();
+        ret.add(op);
+        ret.add(pd);
+        return ret;
     }
-
 
     // 33. operator_symbol ::= binary_operator | unary_operator
-    private void operatorSymbol() {
+    private Operator operatorSymbol() {
         if(nextLA(TokenType.TILDE) || nextLA(TokenType.NOT))
-            unaryOperator();
-        else binaryOperator();
+            return unaryOperator();
+        return binaryOperator();
     }
-
 
     // 34. binary_operator ::= <= | < | > | >= | == | <> | <=> | <: | :> | + | - | * | / | % | **
-    private void binaryOperator() {
-        if(nextLA(TokenType.LTEQ)) match(TokenType.LTEQ);
-        else if(nextLA(TokenType.LT)) match(TokenType.LT);
-        else if(nextLA(TokenType.GT)) match(TokenType.GT);
-        else if(nextLA(TokenType.GTEQ)) match(TokenType.GTEQ);
-        else if(nextLA(TokenType.EQEQ)) match(TokenType.EQEQ);
-        else if(nextLA(TokenType.LTGT)) match(TokenType.LTGT);
-        else if(nextLA(TokenType.UFO)) match(TokenType.UFO);
-        else if(nextLA(TokenType.MIN)) match(TokenType.MIN);
-        else if(nextLA(TokenType.MAX)) match(TokenType.MAX);
-        else if(nextLA(TokenType.PLUS)) match(TokenType.PLUS);
-        else if(nextLA(TokenType.MINUS)) match(TokenType.MINUS);
-        else if(nextLA(TokenType.MULT)) match(TokenType.MULT);
-        else if(nextLA(TokenType.DIV)) match(TokenType.DIV);
-        else if(nextLA(TokenType.MOD)) match(TokenType.MOD);
-        else if(nextLA(TokenType.EXP)) match(TokenType.EXP);
-        else throw new IllegalStateException("Error! Invalid Binary Operator");
+    private BinaryOp binaryOperator() {
+        Token t = currentLA();
+        if(nextLA(TokenType.LTEQ)) {
+            match(TokenType.LTEQ);
+            return new BinaryOp(t,BinaryType.LTEQ);
+        }
+        else if(nextLA(TokenType.LT)) {
+            match(TokenType.LT);
+            return new BinaryOp(t,BinaryType.LT);
+        }
+        else if(nextLA(TokenType.GT)) {
+            match(TokenType.GT);
+            return new BinaryOp(t,BinaryType.GT);
+        }
+        else if(nextLA(TokenType.GTEQ)) {
+            match(TokenType.GTEQ);
+            return new BinaryOp(t,BinaryType.GTEQ);
+        }
+        else if(nextLA(TokenType.EQEQ)) {
+            match(TokenType.EQEQ);
+            return new BinaryOp(t,BinaryType.EQEQ);
+        }
+        else if(nextLA(TokenType.LTGT)) {
+            match(TokenType.LTGT);
+            return new BinaryOp(t,BinaryType.LTGT);
+        }
+        else if(nextLA(TokenType.UFO)) {
+            match(TokenType.UFO);
+            return new BinaryOp(t,BinaryType.UFO);
+        }
+        else if(nextLA(TokenType.PLUS)) {
+            match(TokenType.PLUS);
+            return new BinaryOp(t,BinaryType.PLUS);
+        }
+        else if(nextLA(TokenType.MINUS)) {
+            match(TokenType.MINUS);
+            return new BinaryOp(t,BinaryType.MINUS);
+        }
+        else if(nextLA(TokenType.MULT)) {
+            match(TokenType.MULT);
+            return new BinaryOp(t,BinaryType.MULT);
+        }
+        else if(nextLA(TokenType.DIV)) {
+            match(TokenType.DIV);
+            return new BinaryOp(t,BinaryType.DIV);
+        }
+        else if(nextLA(TokenType.MOD)) {
+            match(TokenType.MOD);
+            return new BinaryOp(t,BinaryType.MOD);
+        }
+        match(TokenType.EXP);
+        return new BinaryOp(t,BinaryType.EXP);
     }
-
 
     // 35. unary-operator ::= ~ | not
-    private void unaryOperator() {
-        if(nextLA(TokenType.TILDE)) match(TokenType.TILDE);
-        else match(TokenType.NOT);
+    private UnaryOp unaryOperator() {
+        Token t = currentLA();
+        if(nextLA(TokenType.TILDE)) {
+            match(TokenType.TILDE);
+            return new UnaryOp(t,UnaryType.NEGATE);
+        }
+        match(TokenType.NOT);
+        return new UnaryOp(t,UnaryType.NOT);
     }
-
 
     /*
     ------------------------------------------------------------
@@ -682,33 +750,45 @@ public class Parser {
     ------------------------------------------------------------
     */
 
-
     // 36. function ::= 'def' ( 'pure' | 'recurs' )? function_header '=>' return_type block_statement
-    private void function() {
+    private FuncDecl function() {
+        Token t = currentLA();
         match(TokenType.DEF);
 
-        if(nextLA(TokenType.PURE)) match(TokenType.PURE);
-        else if(nextLA(TokenType.RECURS)) match(TokenType.RECURS);
+        Modifier mod = null;
+        if(nextLA(TokenType.PURE)) {
+            mod = new Modifier(currentLA(),Mods.PURE);
+            match(TokenType.PURE);
+        }
+        else if(nextLA(TokenType.RECURS)) {
+            mod = new Modifier(currentLA(),Mods.RECURS);
+            match(TokenType.RECURS);
+        }
 
-        functionHeader();
+        ArrayList<AST> header = functionHeader();
         match(TokenType.ARROW);
-        returnType();
-        blockStatement();
+        Type ret = returnType();
+        BlockStmt b = blockStatement();
+        return new FuncDecl(t,mod,(Name)header.get(0),null,(Vector<ParamDecl>)header.get(1),ret,b);
     }
 
-
     // 37. function_header ::= ID function_type_params? '(' formal_params? ')'
-    private void functionHeader() {
+    private ArrayList<AST> functionHeader() {
+        Name n = new Name(currentLA());
         match(TokenType.ID);
 
         if(nextLA(TokenType.LT)) functionTypeParams();
 
         match(TokenType.LPAREN);
+        Vector<ParamDecl> params = null;
         if(nextLA(TokenType.IN) || nextLA(TokenType.OUT) || nextLA(TokenType.INOUT) || nextLA(TokenType.REF))
-            formalParams();
+            params = formalParams();
         match(TokenType.RPAREN);
+        ArrayList<AST> header = new ArrayList<AST>();
+        header.add(n);
+        header.add(params);
+        return header;
     }
-
 
     // 38. function_type_params ::= '<' typeifier ( ',' typeifier )* '>'
     private void functionTypeParams() {
@@ -722,7 +802,6 @@ public class Parser {
         match(TokenType.GT);
     }
 
-
     // 39. typeifier ::= ( 'discr' | 'scalar' | 'class' )? ID
     private void typeifier() {
         if(nextLA(TokenType.DISCR)) match(TokenType.DISCR);
@@ -733,52 +812,59 @@ public class Parser {
         match(TokenType.ID);
     }
 
-
     /*
     ------------------------------------------------------------
                           MAIN FUNCTION
     ------------------------------------------------------------
     */
 
-
     // 40. main ::= 'def' 'main' args? '=>' return_type block_statement
-    private void mainFunc() {
+    private MainDecl mainFunc() {
+        Token t = currentLA();
         match(TokenType.DEF);
-        match(TokenType.MAIN);
-        if(nextLA(TokenType.LPAREN)) args();
+        match(TokenType.MAIN,t);
+        Vector<ParamDecl> args = null;
+        if(nextLA(TokenType.LPAREN)) args = args();
         match(TokenType.ARROW);
-        returnType();
-        blockStatement();
+        Type rt = returnType();
+        BlockStmt b = blockStatement();
+        return new MainDecl(t,args,rt,b);
     }
-
 
     // 41. args ::= '(' formal_params? ')'
-    private void args() {
+    private Vector<ParamDecl> args() {
         match(TokenType.LPAREN);
+        Vector<ParamDecl> pd = null;
         if(nextLA(TokenType.IN) || nextLA(TokenType.OUT) || nextLA(TokenType.INOUT) || nextLA(TokenType.REF))
-            formalParams();
+            pd = formalParams();
         match(TokenType.RPAREN);
+        return pd;
     }
-
 
     // 42. block-statement ::= '{' declaration* statement* '}'
-    private void blockStatement() {
-        match(TokenType.LBRACE);
-        while(nextLA(TokenType.DEF)) declaration();
+    private BlockStmt blockStatement() {
+        Token t = currentLA();
+        match(TokenType.LBRACE,t);
+        Vector<LocalDecl> vd = new Vector<LocalDecl>();
+        while(nextLA(TokenType.DEF)) vd.merge(declaration());
 
-        while(isStatFIRST()) statement();
+        Vector<Statement> st = new Vector<Statement>();
+        while(isStatFIRST()) st.append(statement());
 
-        match(TokenType.RBRACE);
+        match(TokenType.RBRACE,t);
+        return new BlockStmt(t,vd,st);
     }
-
 
     // 43. declaration ::= 'def' 'local'? variable_decl
-    private void declaration() {
+    private Vector<LocalDecl> declaration() {
         match(TokenType.DEF);
         if(nextLA(TokenType.LOCAL)) match(TokenType.LOCAL);
-        variableDecl();
+        ArrayList<AST> ret = variableDecl();
+        //Vector<Var> v = ret.get(2);
+        Vector<LocalDecl> myList = new Vector<LocalDecl>();
+        //for(Var v : )
+        return new Vector<LocalDecl>();
     }
-
 
     /*
     ------------------------------------------------------------
@@ -786,7 +872,6 @@ public class Parser {
     ------------------------------------------------------------
     */
 
-    // TODO: FOR STATEMENT
     // 44. statement ::=    'stop'
     //    | return_statement
     //    | assignment_statement
@@ -794,170 +879,212 @@ public class Parser {
     //    | if_statement
     //    | while_statement
     //    | do_while_statement
+    //    | for_statement
     //    | choice_statement
-    //    | input_statement
-    //    | output_statement
-    private void statement() {
-        if(nextLA(TokenType.STOP)) match(TokenType.STOP);
-        else if(nextLA(TokenType.RETURN)) returnStatement();
-        else if(nextLA(TokenType.LBRACE)) blockStatement();
-        else if(nextLA(TokenType.IF)) ifStatement();
-        else if(nextLA(TokenType.WHILE)) whileStatement();
-        else if(nextLA(TokenType.DO)) doWhileStatement();
-        else if(nextLA(TokenType.FOR)) forStatement();
-        else if(nextLA(TokenType.CHOICE)) choiceStatement();
-        else if(nextLA(TokenType.CIN)) inputStatement();
-        else if(nextLA(TokenType.COUT)) outputStatement();
-        else assignmentStatement();
+    private Statement statement() {
+        if(nextLA(TokenType.STOP)) {
+            Token t = currentLA();
+            match(TokenType.STOP);
+            return new StopStmt(t);
+        }
+        else if(nextLA(TokenType.RETURN)) return returnStatement();
+        else if(nextLA(TokenType.LBRACE)) return blockStatement();
+        else if(nextLA(TokenType.IF)) return ifStatement();
+        else if(nextLA(TokenType.WHILE)) return whileStatement();
+        else if(nextLA(TokenType.DO)) return doWhileStatement();
+        else if(nextLA(TokenType.FOR)) return forStatement();
+        else if(nextLA(TokenType.CHOICE)) return choiceStatement();
+        return assignmentStatement();
     }
-
 
     // 45. return_statement ::= expression?
-    private void returnStatement() {
+    private ReturnStmt returnStatement() {
+        Token t = currentLA();
         match(TokenType.RETURN);
-        if(isPrimExprFIRST()) expression();
+        if(isPrimExprFIRST()) return new ReturnStmt(t,null,expression());
+        return new ReturnStmt(t,null);
     }
-
 
     // 46. assignment_statement ::= 'set' expression assignment_operator expression
                             //    |  logical_or_expression
-    private void assignmentStatement() {
+    private Statement assignmentStatement() {
+        Token t = currentLA();
         if(nextLA(TokenType.SET)) {
             match(TokenType.SET);
-            expression();
-            assignmentOperator();
-            expression();
+            Expression LHS = expression();
+            AssignOp op = assignmentOperator();
+            Expression RHS = expression();
+            return new AssignStmt(t,LHS,RHS,op);
         }
-        else logicalOrExpression();
+        return new ExprStmt(t,logicalOrExpression());
     }
 
-
-    //TODO: Add new operators
     // 47. assignment_operator ::= '=' | '+=' | '-=' | '*=' | '/=' | '%=' | '**='
-    private void assignmentOperator() {
-        if(nextLA(TokenType.EQ)) match(TokenType.EQ);
-        else throw new IllegalStateException("Error! Invalid assignment operator.");
+    private AssignOp assignmentOperator() {
+        Token t = currentLA();
+        if(nextLA(TokenType.EQ)) {
+            match(TokenType.EQ);
+            return new AssignOp(t,AssignType.EQ);
+        }
+        else if(nextLA(TokenType.PLUSEQ)) {
+            match(TokenType.PLUSEQ);
+            return new AssignOp(t,AssignType.PLUSEQ);
+        }
+        else if(nextLA(TokenType.MINUSEQ)) {
+            match(TokenType.MINUSEQ);
+            return new AssignOp(t,AssignType.MINUSEQ);
+        }
+        else if(nextLA(TokenType.MULTEQ)) {
+            match(TokenType.MULTEQ);
+            return new AssignOp(t,AssignType.MULTEQ);
+        }
+        else if(nextLA(TokenType.DIVEQ)) {
+            match(TokenType.DIVEQ);
+            return new AssignOp(t,AssignType.DIVEQ);
+        }
+        else if(nextLA(TokenType.MODEQ)) {
+            match(TokenType.MODEQ);
+            return new AssignOp(t,AssignType.MODEQ);
+        }
+        match(TokenType.EXPEQ);
+        return new AssignOp(t,AssignType.EXPEQ);
     }
-
 
     // 48. if_statement ::= if expression block_statement ( elseif_statement )* ( 'else' block_statement)?
-    private void ifStatement() {
+    private IfStmt ifStatement() {
+        Token t = currentLA();
         match(TokenType.IF);
-        expression();
-        blockStatement();
+        Expression e = expression();
+        BlockStmt b = blockStatement();
 
+        Vector<IfStmt> elifStmts = new Vector<IfStmt>();
         while(nextLA(TokenType.ELSE) && nextLA(TokenType.IF))
-            elseIfStatement();
+            elifStmts.append(elseIfStatement());
 
+        BlockStmt elseB = null;
         if(nextLA(TokenType.ELSE)) {
             match(TokenType.ELSE);
-            blockStatement();
+            return new IfStmt(t,e,b,elifStmts,blockStatement());
         }
+        return new IfStmt(t,e,b,elifStmts);
     }
 
-
     // 49. elseif_statement ::= 'else' 'if' expression block_statement
-    private void elseIfStatement() {
+    private IfStmt elseIfStatement() {
+        Token t = currentLA();
         match(TokenType.ELSE);
         match(TokenType.IF);
-        expression();
-        blockStatement();
+        Expression e = expression();
+        BlockStmt b = blockStatement();
+        return new IfStmt(t,e,b,null);
     }
 
     // 50. while_statement ::= 'while' expression ( 'next' expression )? block_statement
-    private void whileStatement() {
+    private WhileStmt whileStatement() {
+        Token t = currentLA();
         match(TokenType.WHILE);
-        expression();
+        Expression e = expression();
+        Expression nextE = null;
         if(nextLA(TokenType.NEXT)) {
             match(TokenType.NEXT);
-            expression();
+            nextE = expression();
         }
-        blockStatement();
+        BlockStmt b = blockStatement();
+        return new WhileStmt(t,e,nextE,b);
     }
-
 
     // 51. do_while_statement ::= 'do' block_statement ( 'next' expression )? 'while' expression
-    private void doWhileStatement() {
+    private DoStmt doWhileStatement() {
+        Token t = currentLA();
         match(TokenType.DO);
-        blockStatement();
+        BlockStmt b = blockStatement();
+        Expression nextE = null;
         if(nextLA(TokenType.NEXT)) {
             match(TokenType.NEXT);
-            expression();
+            nextE = expression();
         }
         match(TokenType.WHILE);
-        blockStatement();
+        Expression e = expression();
+        return new DoStmt(t,b,nextE,e);
     }
 
-    //TODO: ADD FOR STATEMENT
-    // 52. for_statement ::= 'for' expression ( 'next' expression )? do expression block_statement
-    private void forStatement() {
+    // 52. for_statement ::= 'for' expression ( 'next' expression )? do block_statement
+    private ForStmt forStatement() {
+        Token t = currentLA();
         match(TokenType.FOR);
-        expression();
+        Expression e = expression();
 
+        Expression nextE = null;
         if(nextLA(TokenType.NEXT)) {
             match(TokenType.NEXT);
-            expression();
+            nextE = expression();
         }
         match(TokenType.DO);
-        expression();
-        blockStatement();
+        BlockStmt b = blockStatement();
+        return new ForStmt(t,e,nextE,b);
     }
 
     // 52. choice_statement ::= 'choice' expression '{' case_statement* 'other' block_statement '}'
-    private void choiceStatement() {
+    private ChoiceStmt choiceStatement() {
+        Token t = currentLA();
         match(TokenType.CHOICE);
-        expression();
+        Expression e = expression();
         match(TokenType.LBRACE);
-        while(nextLA(TokenType.ON)) caseStatement();
+        Vector<CaseStmt> cStmts = new Vector<CaseStmt>();
+        while(nextLA(TokenType.ON)) cStmts.append(caseStatement());
         match(TokenType.OTHER);
-        blockStatement();
+        BlockStmt b = blockStatement();
         match(TokenType.RBRACE);
+        return new ChoiceStmt(t,e,cStmts,b);
     }
-
 
     // 53. case_statement ::= 'on' label block_statement
-    private void caseStatement() {
+    private CaseStmt caseStatement() {
+        Token t = currentLA();
         match(TokenType.ON);
-        label();
-        blockStatement();
+        Label l = label();
+        BlockStmt b = blockStatement();
+        return new CaseStmt(t,l,b);
     }
 
-
     // 51. label ::= constant ('..' constant)?
-    private void label() {
-        constant();
+    private Label label() {
+        Token t = currentLA();
+        Expression e = constant();
         if(nextLA(TokenType.INC)) {
             match(TokenType.INC);
             constant();
         }
+        return new Label(t,e);
     }
 
-
     // 55. input_statement ::= 'cin' ( '>>' expression )+
-    private void inputStatement() {
+    private InStmt inputStatement() {
+        Token t = currentLA();
         match(TokenType.CIN);
+        Vector<Expression> e = new Vector<Expression>();
         if(nextLA(TokenType.SRIGHT)) {
             while(nextLA(TokenType.SRIGHT)) {
                 match(TokenType.SRIGHT);
-                expression();
+                e.append(expression());
             }
         }
-        else throw new IllegalStateException("Error! Invalid cin statement");
+        return new InStmt(t,e);
     }
 
-
     // 56. output_statement ::= 'cout' ( '<<' expression )+
-    private void outputStatement() {
+    private OutStmt outputStatement() {
+        Token t = currentLA();
         match(TokenType.COUT);
+        Vector<Expression> e = new Vector<Expression>();
         if(nextLA(TokenType.SLEFT)) {
             while(nextLA(TokenType.SLEFT)) {
                 match(TokenType.SLEFT);
-                expression();
+                e.append(expression());
             }
         }
-        else throw new IllegalStateException("Error! Invalid cout statement");
+        return new OutStmt(t,e);
     }
-
 
     /*
     ------------------------------------------------------------
@@ -965,213 +1092,396 @@ public class Parser {
     ------------------------------------------------------------
     */
 
-
     // 56. primary_expression ::= ID | constant | '(' expression ')'
-    private void primaryExpression() {
+    private Expression primaryExpression() {
+        Token t = currentLA();
         if(nextLA(TokenType.LPAREN)) {
             match(TokenType.LPAREN);
-            expression();
+            Expression e = expression();
             match(TokenType.RPAREN);
+            return e;
         }
-        else if(nextLA(TokenType.ID)) match(TokenType.ID);
-        else constant();
+        else if(nextLA(TokenType.ID)) {
+            Name n = new Name(currentLA());
+            match(TokenType.ID);
+            return new NameExpr(t,n);
+        }
+        return constant();
     }
-
 
     // 57. postfix_expression ::= primary_expression ( '[' expression ']' | '(' arguments ')' | ( '.' | '?.' ) expression)*
-    private void postfixExpression() {
-        primaryExpression();
-
-        while(isAfterPrimExprFIRST()) {
-            if(nextLA(TokenType.LBRACK)) {
-                match(TokenType.LBRACK);
-                expression();
-                match(TokenType.RBRACK);
+    private Expression postfixExpression() {
+        Token startTok = currentLA();
+        Expression primary = primaryExpression();
+        if(isAfterPrimExprFIRST()) {
+            Expression mainExpr = null, e = null;
+            while(isAfterPrimExprFIRST()) {
+                if(nextLA(TokenType.LBRACK)) {
+                    match(TokenType.LBRACK);
+                    expression();
+                    match(TokenType.RBRACK);
+                }
+                else if(nextLA(TokenType.LPAREN)) {
+                    match(TokenType.LPAREN);
+                    Vector<Expression> args = arguments();
+                    match(TokenType.RPAREN);
+                    e = new Invocation(startTok,((NameExpr)primary).getName(),args);
+                }
+                else {
+                    if(nextLA(TokenType.ELVIS)) match(TokenType.ELVIS);
+                    else match(TokenType.PERIOD);
+                    Expression e1 = expression();
+                    e = new FieldExpr(startTok,e1,((NameExpr)primary).getName(),false);
+                }
+                mainExpr = e;
             }
-            else if(nextLA(TokenType.LPAREN)) {
-                match(TokenType.LPAREN);
-                arguments();
-                match(TokenType.RPAREN);
-            }
-            else {
-                if(nextLA(TokenType.ELVIS)) match(TokenType.ELVIS);
-                else match(TokenType.PERIOD);
-                expression();
-            }
+            return mainExpr;
         }
+        return primary;
     }
 
-
     // 58. arguments ::= expression ( ',' expression )*
-    private void arguments() {
-        expression();
+    private Vector<Expression> arguments() {
+        Vector<Expression> ex = new Vector<Expression>();
+        ex.append(expression());
         while(nextLA(TokenType.COMMA)) {
             match(TokenType.COMMA);
-            expression();
+            ex.append(expression());
         }
+        return ex;
     }
 
     // 59. unary_expression ::= unary_operator cast_expression | postfix_expression
-    private void unaryExpression() {
+    private Expression unaryExpression() {
         if(nextLA(TokenType.TILDE) || nextLA(TokenType.NOT)) {
-            unaryOperator();
-            castExpression();
+            Token t = currentLA();
+            UnaryOp uo = unaryOperator();
+            Expression e = castExpression();
+            return new UnaryExpr(t,e,uo);
         }
-        else postfixExpression();
+        return postfixExpression();
     }
-
 
     // 60. cast_expression ::= scalar_type '(' cast_expression ')' | unary_expression
-    private void castExpression() {
+    private Expression castExpression() {
+        Token t = currentLA();
         if(isScalarTypeFIRST()) {
-            scalarType();
+            Type st = scalarType();
             match(TokenType.LPAREN);
-            castExpression();
+            Expression e = castExpression();
             match(TokenType.RPAREN);
+            return new CastExpr(t,st,e);
         }
-        else unaryExpression();
+        return unaryExpression();
     }
-
 
     // 61. power_expression ::= cast_expression ( '**' cast_expression )*
-    private void powerExpression() {
-        castExpression();
-        while(nextLA(TokenType.EXP)) {
-            match(TokenType.EXP);
-            castExpression();
+    private Expression powerExpression() {
+        Token startTok = currentLA();
+        Expression left = castExpression();
+        if(nextLA(TokenType.EXP)) {
+            BinaryExpr mainBE = null, be = null;
+            while(nextLA(TokenType.EXP)) {
+                System.out.println(currentLA().getLocation().toString());
+                BinaryOp bo = new BinaryOp(currentLA(),BinaryType.EXP);
+               // System.out.println(bo.location.start.toString());
+                match(TokenType.EXP);
+                Expression right = castExpression();
+                if(mainBE != null)
+                    be = new BinaryExpr(startTok,mainBE,right,bo);
+                else
+                    be = new BinaryExpr(startTok,left,right,bo);
+                mainBE = be;
+            }
+            return mainBE;
         }
+        return left;
     }
-
 
     // 62. multiplication_expression ::= power_expression ( ( '*' | '/' | '%' ) power_expression )*
-    private void multiplicationExpression() {
-        powerExpression();
+    private Expression multiplicationExpression() {
+        Token startTok = currentLA();
+        Expression left = powerExpression();
+        if(isAfterPowerFIRST()) {
+            BinaryExpr mainBE = null, be = null;
+            while(isAfterPowerFIRST()) {
+                BinaryOp bo = null;
+                if(nextLA(TokenType.MULT)) {
+                    bo = new BinaryOp(currentLA(),BinaryType.MULT);
+                    match(TokenType.MULT);
+                }
+                else if(nextLA(TokenType.DIV)) {
+                    bo = new BinaryOp(currentLA(),BinaryType.DIV);
+                    match(TokenType.DIV);
+                }
+                else {
+                    bo = new BinaryOp(currentLA(),BinaryType.MOD);
+                    match(TokenType.MOD);
+                }
 
-        while(isAfterPowerFIRST()) {
-            if(nextLA(TokenType.MULT)) match(TokenType.MULT);
-            else if(nextLA(TokenType.DIV)) match(TokenType.DIV);
-            else match(TokenType.MOD);
-
-            powerExpression();
+                Expression right = powerExpression();
+                if(mainBE != null)
+                    be = new BinaryExpr(startTok,mainBE,right,bo);
+                else
+                    be = new BinaryExpr(startTok,left,right,bo);
+                mainBE = be;
+            }
+            return mainBE;
         }
+        return left;
     }
-
 
     // 63. additive_expression ::= multiplication_expression ( ( '+' | '-' ) multiplication_expression )*
-    private void additiveExpression() {
-        multiplicationExpression();
+    private Expression additiveExpression() {
+        Token startTok = currentLA();
+        Expression left = multiplicationExpression();
 
-        while(nextLA(TokenType.PLUS) || nextLA(TokenType.MINUS)) {
-            if(nextLA(TokenType.PLUS)) match(TokenType.PLUS);
-            else match(TokenType.MINUS);
+        if(nextLA(TokenType.PLUS) || nextLA(TokenType.MINUS)) {
+            BinaryExpr mainBE = null, be = null;
+            while(nextLA(TokenType.PLUS) || nextLA(TokenType.MINUS)) {
+                BinaryOp bo = null;
+                if(nextLA(TokenType.PLUS)) {
+                    bo = new BinaryOp(currentLA(),BinaryType.PLUS);
+                    match(TokenType.PLUS);
+                }
+                else if(nextLA(TokenType.MINUS)) {
+                    bo = new BinaryOp(currentLA(),BinaryType.MINUS);
+                    match(TokenType.MINUS);
+                }
 
-            multiplicationExpression();
+                Expression right = multiplicationExpression();
+                if(mainBE != null)
+                    be = new BinaryExpr(startTok,mainBE,right,bo);
+                else
+                    be = new BinaryExpr(startTok,left,right,bo);
+                mainBE = be;
+            }
+            return mainBE;
         }
+        return left;
     }
 
-
     // 64. shift_expression ::= additive_expression ( ( '<<' | '>>' ) additive_expression )*
-//    private void shiftExpression() {
-//        additiveExpression();
-//        ArrayList<TokenType> SLEFT_SRIGHT = expectedShiftToks();
-//
-//        while(anyLA(SLEFT_SRIGHT)) {
-//            if(nextLA(TokenType.SLEFT)) match(TokenType.SLEFT);
-//            else match(TokenType.SRIGHT);
-//            additiveExpression();
-//        }
-//    }
+    private Expression shiftExpression() {
+        Token startTok = currentLA();
+        Expression left = additiveExpression();
 
+        if(nextLA(TokenType.SLEFT) || nextLA(TokenType.SRIGHT)) {
+            BinaryExpr mainBE = null, be = null;
+            while (nextLA(TokenType.SLEFT) || nextLA(TokenType.SRIGHT)) {
+                BinaryOp bo = null;
+                if (nextLA(TokenType.SLEFT)) {
+                    bo = new BinaryOp(currentLA(), BinaryType.SLEFT);
+                    match(TokenType.SLEFT);
+                } else if (nextLA(TokenType.SRIGHT)) {
+                    bo = new BinaryOp(currentLA(), BinaryType.SRIGHT);
+                    match(TokenType.SRIGHT);
+                }
+                Expression right = additiveExpression();
+                if (mainBE != null)
+                    be = new BinaryExpr(startTok, mainBE, right, bo);
+                else
+                    be = new BinaryExpr(startTok, left, right, bo);
+                mainBE = be;
+            }
+            return mainBE;
+        }
+        return left;
+    }
 
     // 65. relational_expression ::= shift_expression ( ( '<' | '>' | '<=' | '>=' ) shift_expression )*
-    private void relationalExpression() {
-        additiveExpression();
+    private Expression relationalExpression() {
+        Token startTok = currentLA();
+        Expression left = shiftExpression();
 
-        while(isAfterAddFIRST()) {
-            if(nextLA(TokenType.LT)) match(TokenType.LT);
-            else if(nextLA(TokenType.GT)) match(TokenType.GT);
-            else if(nextLA(TokenType.LTEQ)) match(TokenType.LTEQ);
-            else match(TokenType.GTEQ);
-
-            additiveExpression();
+        if(isAfterAddFIRST()) {
+            BinaryExpr mainBE = null, be = null;
+            while(isAfterAddFIRST()) {
+                BinaryOp bo = null;
+                if(nextLA(TokenType.LT)) {
+                    bo = new BinaryOp(currentLA(),BinaryType.LT);
+                    match(TokenType.LT);
+                }
+                else if(nextLA(TokenType.GT)) {
+                    bo = new BinaryOp(currentLA(),BinaryType.GT);
+                    match(TokenType.GT);
+                }
+                else if(nextLA(TokenType.LTEQ)) {
+                    bo = new BinaryOp(currentLA(),BinaryType.LTEQ);
+                    match(TokenType.LTEQ);
+                }
+                else if(nextLA(TokenType.GTEQ)) {
+                    bo = new BinaryOp(currentLA(),BinaryType.GTEQ);
+                    match(TokenType.GTEQ);
+                }
+                Expression right = shiftExpression();
+                if(mainBE != null)
+                    be = new BinaryExpr(startTok,mainBE,right,bo);
+                else
+                    be = new BinaryExpr(startTok,left,right,bo);
+                mainBE = be;
+            }
+            return mainBE;
         }
+        return left;
     }
 
     // TODO: ADD new keywords
     // 66. instanceof_expression ::= relational_expression ( ( 'instanceof' | '!instanceof' | 'as?' ) relational_expression )*
-    private void instanceOfExpression() {
-        relationalExpression();
-        while(nextLA(TokenType.INSTANCEOF)) {
-            match(TokenType.INSTANCEOF);
-            relationalExpression();
+    private Expression instanceOfExpression() {
+        Token startTok = currentLA();
+        Expression left = relationalExpression();
+        if(nextLA(TokenType.INSTANCEOF)) {
+            BinaryExpr mainBE = null, be = null;
+            while(nextLA(TokenType.INSTANCEOF)) {
+                BinaryOp bo = new BinaryOp(currentLA(), BinaryType.INOF);
+                match(TokenType.INSTANCEOF);
+                Expression right = relationalExpression();
+                if(mainBE != null)
+                    be = new BinaryExpr(startTok,mainBE,right,bo);
+                else
+                    be = new BinaryExpr(startTok,left,right,bo);
+                mainBE = be;
+            }
+            return mainBE;
         }
+        return left;
     }
 
-
-    // 67. equality_expression ::= instanceof_expression ( ( '==' | '<>' ) instanceof_expression )*
-    private void equalityExpression() {
-        instanceOfExpression();
-        while(nextLA(TokenType.EQEQ) || nextLA(TokenType.NEQ)) {
-            if(nextLA(TokenType.EQEQ)) match(TokenType.EQEQ);
-            else match(TokenType.NEQ);
-            instanceOfExpression();
+    // 67. equality_expression ::= instanceof_expression ( ( '==' | '!=' ) instanceof_expression )*
+    private Expression equalityExpression() {
+        Token startTok = currentLA();
+        Expression left = instanceOfExpression();
+        if(nextLA(TokenType.EQEQ) || nextLA(TokenType.NEQ)) {
+            BinaryExpr mainBE = null, be = null;
+            while (nextLA(TokenType.EQEQ) || nextLA(TokenType.NEQ)) {
+                BinaryOp bo = null;
+                if (nextLA(TokenType.EQEQ)) {
+                    bo = new BinaryOp(currentLA(), BinaryType.EQEQ);
+                    match(TokenType.EQEQ);
+                } else if (nextLA(TokenType.NEQ)) {
+                    bo = new BinaryOp(currentLA(), BinaryType.NEQ);
+                    match(TokenType.NEQ);
+                }
+                Expression right = instanceOfExpression();
+                if (mainBE != null)
+                    be = new BinaryExpr(startTok, mainBE, right, bo);
+                else
+                    be = new BinaryExpr(startTok, left, right, bo);
+                mainBE = be;
+            }
+            return mainBE;
         }
+        return left;
     }
-
 
     // 68. and_expression ::= equality_expression ( '&' equality_expression )*
-    private void andExpression() {
-        equalityExpression();
-        while(nextLA(TokenType.BAND)) {
-            match(TokenType.BAND);
-            equalityExpression();
+    private Expression andExpression() {
+        Token startTok = currentLA();
+        Expression left = equalityExpression();
+        if(nextLA(TokenType.BAND)) {
+            BinaryExpr mainBE = null, be = null;
+            while(nextLA(TokenType.BAND)) {
+                BinaryOp bo = new BinaryOp(currentLA(),BinaryType.BAND);
+                match(TokenType.BAND);
+                Expression right = equalityExpression();
+                if(mainBE != null)
+                    be = new BinaryExpr(startTok,mainBE,right,bo);
+                else
+                    be = new BinaryExpr(startTok,left,right,bo);
+                mainBE = be;
+            }
+            return mainBE;
         }
+        return left;
     }
-
 
     // 69. exclusive_or_expression ::= and_expression ( '^' and_expression )*
-    private void exclusiveOrExpression() {
-        andExpression();
-        while(nextLA(TokenType.XOR)) {
-            match(TokenType.XOR);
-            andExpression();
+    private Expression exclusiveOrExpression() {
+        Token startTok = currentLA();
+        Expression left = andExpression();
+        if(nextLA(TokenType.XOR)) {
+            BinaryExpr mainBE = null, be = null;
+            while(nextLA(TokenType.XOR)) {
+                BinaryOp bo = new BinaryOp(currentLA(),BinaryType.XOR);
+                match(TokenType.XOR);
+                Expression right = andExpression();
+                if(mainBE != null)
+                    be = new BinaryExpr(startTok,mainBE,right,bo);
+                else
+                    be = new BinaryExpr(startTok,left,right,bo);
+                mainBE = be;
+            }
+            return mainBE;
         }
+        return left;
     }
-
 
     // 70. inclusive_or_expression ::= exclusive_or_expression ( '|' exclusive_or_expression )*
-    private void inclusiveOrExpression() {
-        exclusiveOrExpression();
-        while(nextLA(TokenType.BOR)) {
-            match(TokenType.BOR);
-            exclusiveOrExpression();
+    private Expression inclusiveOrExpression() {
+        Token startTok = currentLA();
+        Expression left = exclusiveOrExpression();
+        if(nextLA(TokenType.BOR)) {
+            BinaryExpr mainBE = null, be = null;
+            while(nextLA(TokenType.BOR)) {
+                BinaryOp bo = new BinaryOp(currentLA(),BinaryType.BOR);
+                match(TokenType.BOR);
+                Expression right = exclusiveOrExpression();
+                if(mainBE != null)
+                    be = new BinaryExpr(startTok,mainBE,right,bo);
+                else
+                    be = new BinaryExpr(startTok,left,right,bo);
+                mainBE = be;
+            }
+            return mainBE;
         }
+        return left;
     }
-
 
     // 71. logical_and_expression ::= inclusive_or_expression ( 'and' inclusive_or_expression )*
-    private void logicalAndExpression() {
-        inclusiveOrExpression();
-        while(nextLA(TokenType.AND)) {
-            match(TokenType.AND);
-            inclusiveOrExpression();
+    private Expression logicalAndExpression() {
+        Token startTok = currentLA();
+        Expression left = inclusiveOrExpression();
+        if(nextLA(TokenType.AND)) {
+            BinaryExpr mainBE = null, be = null;
+            while(nextLA(TokenType.AND)) {
+                BinaryOp bo = new BinaryOp(currentLA(),BinaryType.AND);
+                match(TokenType.AND);
+                Expression right = inclusiveOrExpression();
+                if(mainBE != null)
+                    be = new BinaryExpr(startTok,mainBE,right,bo);
+                else
+                    be = new BinaryExpr(startTok,left,right,bo);
+                mainBE = be;
+            }
+            return mainBE;
         }
+        return left;
     }
-
 
     // 72. logical_or_expression ::= logical_and_expression ( 'or' logical_and_expression )*
-    private void logicalOrExpression() {
-        logicalAndExpression();
-        while(nextLA(TokenType.OR)) {
-            match(TokenType.OR);
-            logicalAndExpression();
+    private Expression logicalOrExpression() {
+        Token startTok = currentLA();
+        Expression left = logicalAndExpression();
+        if(nextLA(TokenType.OR)) {
+            BinaryExpr mainBE = null, be = null;
+            while(nextLA(TokenType.OR)) {
+                BinaryOp bo = new BinaryOp(currentLA(),BinaryType.OR);
+                match(TokenType.OR);
+                Expression right = logicalAndExpression();
+                if(mainBE != null)
+                    be = new BinaryExpr(startTok,mainBE,right,bo);
+                else
+                    be = new BinaryExpr(startTok,left,right,bo);
+                mainBE = be;
+            }
+            return mainBE;
         }
+        return left;
     }
 
-
     // 73. expression ::= logical_or_expression
-    private void expression() { logicalOrExpression(); }
-
+    private Expression expression() { return logicalOrExpression(); }
 
     /*
     ------------------------------------------------------------
@@ -1179,40 +1489,42 @@ public class Parser {
     ------------------------------------------------------------
     */
 
-
     // 74. constant ::= object_constant | array_constant | list_constant | scalar_constant
-    private void constant() {
-        if(nextLA(TokenType.NEW)) objectConstant();
+    private Expression constant() {
+        if(nextLA(TokenType.NEW)) return objectConstant();
         else if(nextLA(TokenType.ARRAY) || nextLA(TokenType.LBRACK))
             arrayConstant();
         else if(nextLA(TokenType.LIST) || nextLA(TokenType.LBRACE))
-            listConstant();
-        else scalarConstant();
+            return listConstant();
+        return scalarConstant();
     }
-
 
     // 75. object_constant ::= 'new' ID '(' (object_field ( ',' object_field )* ')'
-    private void objectConstant() {
-        match(TokenType.NEW);
-        match(TokenType.ID);
-        match(TokenType.LPAREN);
+    private NewExpr objectConstant() {
+        Token t = currentLA();
+        match(TokenType.NEW,t);
+        Name n = new Name(currentLA());
+        match(TokenType.ID,t);
+        match(TokenType.LPAREN,t);
 
-        objectField();
+        Vector<Var> vars = new Vector<Var>(objectField());
         while(nextLA(TokenType.COMMA)) {
-            match(TokenType.COMMA);
-            objectField();
+            match(TokenType.COMMA,t);
+            vars.append(objectField());
         }
-        match(TokenType.RPAREN);
+        match(TokenType.RPAREN,t);
+        return new NewExpr(t,n,vars);
     }
 
-
-    // 76. object_field ::= ID ':' expression
-    private void objectField() {
-        match(TokenType.ID);
-        match(TokenType.COLON);
-        expression();
+    // 76. object_field ::= ID '=' expression
+    private Var objectField() {
+        Token t = currentLA();
+        Name n = new Name(currentLA());
+        match(TokenType.ID,t);
+        match(TokenType.EQ,t);
+        Expression e = expression();
+        return new Var(t,n,e);
     }
-
 
     // 77. array_constant ::= 'Array' ( '[' expression ']' )* '(' arguments ')'
     private void arrayConstant() {
@@ -1227,34 +1539,54 @@ public class Parser {
         match(TokenType.RPAREN);
     }
 
-
     // 78. list_constant ::= 'List' '(' expression (',' expression)* ')'
-    private void listConstant() {
-        match(TokenType.LIST);
-        match(TokenType.LPAREN);
-        expression();
+    private ListLiteral listConstant() {
+        Token t = currentLA();
+        match(TokenType.LIST,t);
+        match(TokenType.LPAREN,t);
+        Vector<Expression> seq = new Vector<Expression>(expression());
         while(nextLA(TokenType.COMMA)) {
-            match(TokenType.COMMA);
-            expression();
+            match(TokenType.COMMA,t);
+            seq.append(expression());
         }
-        match(TokenType.RPAREN);
+        match(TokenType.RPAREN,t);
+        return new ListLiteral(t, seq);
     }
-
-
 
     // 79. scalar_constant ::= discrete_constant | STRING_LITERAL | TEXT_LITERAL | REAL_LITERAL
-    private void scalarConstant() {
-        if(nextLA(TokenType.STR_LIT)) match(TokenType.STR_LIT);
-        else if(nextLA(TokenType.TEXT_LIT)) match(TokenType.TEXT_LIT);
-        else if(nextLA(TokenType.REAL_LIT)) match(TokenType.REAL_LIT);
-        else discreteConstant();
+    private Literal scalarConstant() {
+        Token t = currentLA();
+        if(nextLA(TokenType.STR_LIT)) {
+            match(TokenType.STR_LIT);
+            return new Literal(t, ConstantKind.STR);
+        }
+        else if(nextLA(TokenType.TEXT_LIT)) {
+            match(TokenType.TEXT_LIT);
+            return new Literal(t, ConstantKind.TEXT);
+        }
+        else if(nextLA(TokenType.REAL_LIT)) {
+            match(TokenType.REAL_LIT);
+            return new Literal(t, ConstantKind.REAL);
+        }
+        return discreteConstant();
     }
 
-
-    // 89. discrete_constant ::= INT_LITERAL | CHAR_LITERAL | BOOL_LITERAL
-    private void discreteConstant() {
-        if(nextLA(TokenType.INT_LIT)) match(TokenType.INT_LIT);
-        else if(nextLA(TokenType.CHAR_LIT)) match(TokenType.CHAR_LIT);
-        else if(nextLA(TokenType.BOOL_LIT)) match(TokenType.BOOL_LIT);
+    // 80. discrete_constant ::= INT_LITERAL | CHAR_LITERAL | BOOL_LITERAL
+    private Literal discreteConstant() {
+        Token t = currentLA();
+        Literal l = null;
+        if(nextLA(TokenType.INT_LIT)) {
+            match(TokenType.INT_LIT);
+            l = new Literal(t, ConstantKind.INT);
+        }
+        else if(nextLA(TokenType.CHAR_LIT)) {
+            match(TokenType.CHAR_LIT);
+            l = new Literal(t, ConstantKind.CHAR);
+        }
+        else if(nextLA(TokenType.BOOL_LIT)) {
+            match(TokenType.BOOL_LIT);
+            l = new Literal(t, ConstantKind.BOOL);
+        }
+        return l;
     }
 }
