@@ -20,7 +20,7 @@ public class Main {
 
     // This will read in a C Minor source program into a buffer, and it will return a
     private static String readProgram(String fileName) throws Exception {
-        File program = new File("/home/dalev/C_Minor/UnitTests/GoodTests/"+fileName);
+        File program = new File(fileName);
         BufferedReader readInput = new BufferedReader(new FileReader(program));
         StringBuilder programAsStr = new StringBuilder();
 

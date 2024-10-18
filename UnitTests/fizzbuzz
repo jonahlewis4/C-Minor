@@ -1,0 +1,17 @@
+def main => void {
+    def i = 1 Int
+    for (i <= 30) next set i += 1 do {
+        def fizzybuzzy = false Bool
+        if (i % 3 == 0) {
+            cout<<'fizz'
+            fizzybuzzy = true
+        }
+        if (i % 5 == 0) {
+            cout<<'buzz'
+            fizzybuzzy = true
+        }
+        if(not fizzybuzzy) {
+            cout<<${i}
+        }
+    }
+}
